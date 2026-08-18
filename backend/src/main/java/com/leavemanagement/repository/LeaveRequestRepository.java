@@ -9,6 +9,7 @@ import java.util.List;
 public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long> {
     List<LeaveRequest> findByApplicantId(Long applicantId);
     List<LeaveRequest> findByManagerApproverId(Long managerApproverId);
+    List<LeaveRequest> findByApplicantManagerId(Long managerId);
     List<LeaveRequest> findByHrApproverId(Long hrApproverId);
     List<LeaveRequest> findByStatus(String status);
 }

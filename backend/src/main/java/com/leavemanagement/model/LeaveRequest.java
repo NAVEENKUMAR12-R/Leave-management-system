@@ -42,4 +42,8 @@ public class LeaveRequest {
     private String status; // PENDING_MANAGER, PENDING_HR, APPROVED, REJECTED, WITHDRAWN
 
     private String reason;
+
+    private Boolean isCompanySponsored; // true if paid/company sponsored, false if unpaid leave of absence
+
+    private String payStatus; // COMPANY_SPONSORED, UNPAID_LEAVE_OF_ABSENCE
 }

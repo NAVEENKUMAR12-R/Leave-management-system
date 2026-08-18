@@ -2,9 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
-import AbsenceCalendar from './components/AbsenceCalendar';
+import LeaveCalendar from './components/LeaveCalendar';
 import TeamInbox from './components/TeamInbox';
 import AdminPolicyPanel from './components/AdminPolicyPanel';
+import LeaveHistory from './components/LeaveHistory';
 import './index.css';
 
 function PageTitle({ title }: { title: string }) {
@@ -54,7 +55,15 @@ function AppRoutes() {
             <>
               <PageTitle title="Time Off & Leave" />
               <div className="page-content">
-                <AbsenceCalendar />
+                <LeaveCalendar />
+              </div>
+            </>
+          } />
+          <Route path="/history" element={
+            <>
+              <PageTitle title="Leave Records & History" />
+              <div className="page-content">
+                <LeaveHistory />
               </div>
             </>
           } />

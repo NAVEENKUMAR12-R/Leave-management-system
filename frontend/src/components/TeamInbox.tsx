@@ -13,18 +13,24 @@ export default function TeamInbox() {
 
   const isHR = hasRole('ROLE_HR') || hasRole('ROLE_HR_ADMIN');
 
+  const [allLeaves, setAllLeaves] = useState<TimeOffResponse[]>([]);
+
   useEffect(() => {
     fetchPendingLeaves();
     fetchStats();
-  }, [dateFilter]);
+  }, [dateFilter, tab]);
 
   const fetchPendingLeaves = async () => {
     try {
-      const endpoint = isHR ? '/leaves/hr/to-approve' : '/leaves/manager/to-approve';
-      const res = await api.get(endpoint);
-      setPendingLeaves(res.data);
+      if (tab === 'pending') {
+        const res = await api.get('/leaves/pending-approvals');
+        setPendingLeaves(res.data);
+      } else {
+        const res = await api.get('/leaves/history');
+        setAllLeaves(res.data);
+      }
     } catch (err) {
-      console.error('Failed to fetch pending leaves', err);
+      console.error('Failed to fetch inbox leaves', err);
     }
   };
 
@@ -128,42 +134,81 @@ export default function TeamInbox() {
           </div>
         </div>
         <div className="card-body-compact">
-          {pendingLeaves.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">✅</div>
-              <div className="empty-state-text">All caught up! No pending requests.</div>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Type</th>
-                  <th>Date Range</th>
-                  <th>Days</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingLeaves.map(l => (
-                  <tr key={l.id}>
-                    <td style={{ fontWeight: 600 }}>{l.workerName || `Worker #${l.workerId}`}</td>
-                    <td>{l.timeOffType}</td>
-                    <td>{l.startDate} → {l.endDate}</td>
-                    <td>{l.totalQuantity}</td>
-                    <td><span className={`status-badge status-${l.routingStatus.toLowerCase()}`}>{l.routingStatus.replace('_', ' ')}</span></td>
-                    <td>
-                      <div className="table-actions">
-                        <button className="btn btn-success btn-sm" onClick={() => processLeave(l.id, 'APPROVE')}>Approve</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => processLeave(l.id, 'REJECT')}>Deny</button>
-                      </div>
-                    </td>
+          {(() => {
+            const displayLeaves = tab === 'pending' ? pendingLeaves : allLeaves;
+            if (displayLeaves.length === 0) {
+              return (
+                <div className="empty-state">
+                  <div className="empty-state-icon">✅</div>
+                  <div className="empty-state-text">
+                    {tab === 'pending' ? 'All caught up! No pending requests.' : 'No processed requests found.'}
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Type</th>
+                    <th>Date Range</th>
+                    <th>Days</th>
+                    <th>Pay Status</th>
+                    <th>Workflow Stage</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {displayLeaves.map(l => {
+                    const isPending = l.routingStatus === 'PENDING_MANAGER' || l.routingStatus === 'PENDING_HR' || l.routingStatus === 'PENDING_ADMIN';
+                    return (
+                      <tr key={l.id}>
+                        <td style={{ fontWeight: 600 }}>{l.workerName || `Worker #${l.workerId}`}</td>
+                        <td>
+                          <span style={{ fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-hover)', fontSize: 'var(--font-size-xs)' }}>
+                            {l.timeOffType}
+                          </span>
+                        </td>
+                        <td>{l.startDate} → {l.endDate}</td>
+                        <td style={{ fontWeight: 700 }}>{l.totalQuantity} {l.totalQuantity === 1 ? 'day' : 'days'}</td>
+                        <td>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: 'var(--font-size-xs)',
+                            fontWeight: 600,
+                            background: l.isCompanySponsored !== false ? 'var(--wd-green-light)' : 'var(--wd-orange-light)',
+                            color: l.isCompanySponsored !== false ? 'var(--wd-green)' : 'var(--wd-orange)'
+                          }}>
+                            {l.isCompanySponsored !== false ? '● Paid (Salary Credited)' : '○ Unpaid (No Salary / LOP)'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge status-${l.routingStatus.toLowerCase()}`}>
+                            {l.routingStatus === 'PENDING_ADMIN' ? 'Pending Admin (HR Request)' : l.routingStatus.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td>
+                          {isPending ? (
+                            <div className="table-actions">
+                              <button className="btn btn-success btn-sm" onClick={() => processLeave(l.id, 'APPROVE')}>Approve</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => processLeave(l.id, 'REJECT')}>Deny</button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Completed</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
       </div>
     </>

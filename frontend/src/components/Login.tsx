@@ -28,8 +28,8 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo-icon">W</div>
-          <span className="login-logo-text">Absence Hub</span>
+          <div className="login-logo-icon">L</div>
+          <span className="login-logo-text">Leave Hub</span>
         </div>
         <h1 className="login-title">Welcome back</h1>
         <p className="login-subtitle">Sign in to manage your time off</p>

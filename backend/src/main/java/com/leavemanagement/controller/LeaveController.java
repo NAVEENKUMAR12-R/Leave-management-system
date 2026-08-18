@@ -20,10 +20,14 @@ public class LeaveController {
 
     private final LeaveService leaveService;
     private final LeaveBalanceRepository leaveBalanceRepository;
+    private final com.leavemanagement.repository.LeavePolicyRepository leavePolicyRepository;
 
-    public LeaveController(LeaveService leaveService, LeaveBalanceRepository leaveBalanceRepository) {
+    public LeaveController(LeaveService leaveService,
+                           LeaveBalanceRepository leaveBalanceRepository,
+                           com.leavemanagement.repository.LeavePolicyRepository leavePolicyRepository) {
         this.leaveService = leaveService;
         this.leaveBalanceRepository = leaveBalanceRepository;
+        this.leavePolicyRepository = leavePolicyRepository;
     }
 
     @PostMapping("/apply")
@@ -46,14 +50,58 @@ public class LeaveController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/my-policies")
+    public ResponseEntity<List<com.leavemanagement.model.LeavePolicy>> getMyPolicies(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        List<com.leavemanagement.model.LeavePolicy> activePolicies = leavePolicyRepository.findAll().stream()
+                .filter(p -> p.getIsActive() == null || (p.getIsActive() && !"ARCHIVED".equalsIgnoreCase(p.getPolicyStatus())))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(activePolicies);
+    }
+
     @GetMapping("/manager/to-approve")
     public ResponseEntity<List<TimeOffResponseDTO>> getManagerLeavesToApprove(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         return ResponseEntity.ok(leaveService.getLeavesToApproveByManager(userDetails.getId()));
     }
 
     @GetMapping("/hr/to-approve")
-    public ResponseEntity<List<TimeOffResponseDTO>> getHRLeavesToApprove() {
-        return ResponseEntity.ok(leaveService.getLeavesToApproveByHR());
+    public ResponseEntity<List<TimeOffResponseDTO>> getHRLeavesToApprove(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(leaveService.getLeavesToApproveByHR(userDetails.getId()));
+    }
+
+    @GetMapping("/admin/to-approve")
+    public ResponseEntity<List<TimeOffResponseDTO>> getAdminLeavesToApprove(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(leaveService.getLeavesToApproveByAdmin(userDetails.getId()));
+    }
+
+    @GetMapping("/pending-approvals")
+    public ResponseEntity<List<TimeOffResponseDTO>> getPendingApprovals(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HR_ADMIN"));
+        boolean isHR = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HR"));
+        boolean isManager = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+
+        List<TimeOffResponseDTO> results = new java.util.ArrayList<>();
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+
+        if (isAdmin) {
+            for (TimeOffResponseDTO dto : leaveService.getLeavesToApproveByAdmin(userDetails.getId())) {
+                if (ids.add(dto.getId())) results.add(dto);
+            }
+        }
+        if (isHR) {
+            for (TimeOffResponseDTO dto : leaveService.getLeavesToApproveByHR(userDetails.getId())) {
+                if (ids.add(dto.getId())) results.add(dto);
+            }
+        }
+        if (isManager) {
+            for (TimeOffResponseDTO dto : leaveService.getLeavesToApproveByManager(userDetails.getId())) {
+                if (ids.add(dto.getId())) results.add(dto);
+            }
+        }
+
+        return ResponseEntity.ok(results);
     }
 
     @PutMapping("/{leaveId}/process")
@@ -64,6 +112,62 @@ public class LeaveController {
         return ResponseEntity.ok(leaveService.processLeaveRequest(userDetails.getId(), leaveId, action));
     }
     
+    @GetMapping("/history/my")
+    public ResponseEntity<List<TimeOffResponseDTO>> getMyLeaveHistory(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(leaveService.getMyLeaves(userDetails.getId()));
+    }
+
+    @GetMapping("/history/team")
+    public ResponseEntity<List<TimeOffResponseDTO>> getTeamLeaveHistory(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(leaveService.getDirectReporteesLeavesHistory(userDetails.getId()));
+    }
+
+    @GetMapping("/history/organization")
+    public ResponseEntity<List<TimeOffResponseDTO>> getOrganizationLeaveHistory(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(leaveService.getAllLeavesHistory());
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<TimeOffResponseDTO>> getLeaveHistory(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        boolean isHR = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HR") || a.getAuthority().equals("ROLE_HR_ADMIN"));
+        boolean isManager = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+
+        if (isHR) {
+            return ResponseEntity.ok(leaveService.getAllLeavesHistory());
+        } else if (isManager) {
+            return ResponseEntity.ok(leaveService.getDirectReporteesLeavesHistory(userDetails.getId()));
+        } else {
+            return ResponseEntity.ok(leaveService.getMyLeaves(userDetails.getId()));
+        }
+    }
+
+    @GetMapping("/history/user/{userId}")
+    public ResponseEntity<List<TimeOffResponseDTO>> getUserLeaveHistory(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long userId) {
+        boolean isHR = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HR") || a.getAuthority().equals("ROLE_HR_ADMIN"));
+        boolean isManager = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+
+        if (isHR || isManager || userDetails.getId().equals(userId)) {
+            return ResponseEntity.ok(leaveService.getUserLeavesHistory(userId));
+        }
+        throw new RuntimeException("Access denied to view this user's leave history.");
+    }
+
+    @GetMapping("/team-members")
+    public ResponseEntity<List<com.leavemanagement.payload.UserSummaryDTO>> getTeamMembers(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(leaveService.getDirectReportees(userDetails.getId()));
+    }
+
+    @GetMapping("/employees")
+    public ResponseEntity<List<com.leavemanagement.payload.UserSummaryDTO>> getAllEmployees() {
+        return ResponseEntity.ok(leaveService.getAllEmployeesSummary());
+    }
+
     @PutMapping("/{leaveId}/withdraw")
     public ResponseEntity<TimeOffResponseDTO> withdrawLeave(@AuthenticationPrincipal UserDetailsImpl userDetails,
                                           @PathVariable Long leaveId) {

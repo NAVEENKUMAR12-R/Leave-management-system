@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* ═══════════════════════════════════════════════════
-   DESIGN SYSTEM — Workday-Inspired Absence Manager
+   DESIGN SYSTEM — Leave Management System
    ═══════════════════════════════════════════════════ */
 
 :root {
@@ -452,10 +452,10 @@ a:hover { text-decoration: underline; }
 }
 
 /* ═══════════════════════════════════════════════════
-   UNIFIED ABSENCE CALENDAR
+   UNIFIED LEAVE CALENDAR
    ═══════════════════════════════════════════════════ */
 
-.absence-calendar {
+.leave-calendar {
   user-select: none;
 }
 

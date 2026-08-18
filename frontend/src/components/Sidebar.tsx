@@ -22,9 +22,9 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">W</div>
+        <div className="sidebar-brand-icon">L</div>
         <div>
-          <div className="sidebar-brand-text">Absence Hub</div>
+          <div className="sidebar-brand-text">Leave Hub</div>
           <div className="sidebar-brand-sub">Leave Management</div>
         </div>
       </div>
@@ -35,6 +35,11 @@ export default function Sidebar() {
         <Link to="/" className={`sidebar-link ${isActive('/') ? 'active' : ''}`}>
           <span className="link-icon">📅</span>
           Time Off & Leave
+        </Link>
+
+        <Link to="/history" className={`sidebar-link ${isActive('/history') ? 'active' : ''}`}>
+          <span className="link-icon">📜</span>
+          Leave Records & History
         </Link>
 
         {(isManager || isHR) && (

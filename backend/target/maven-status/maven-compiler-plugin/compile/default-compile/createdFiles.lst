@@ -3,6 +3,7 @@ com\leavemanagement\model\Holiday.class
 com\leavemanagement\controller\AdminController.class
 com\leavemanagement\service\CalendarService.class
 com\leavemanagement\model\LeaveBalance.class
+com\leavemanagement\payload\UserSummaryDTO.class
 com\leavemanagement\payload\TimeOffResponseDTO.class
 com\leavemanagement\service\DashboardService.class
 com\leavemanagement\payload\DashboardStatsDTO.class

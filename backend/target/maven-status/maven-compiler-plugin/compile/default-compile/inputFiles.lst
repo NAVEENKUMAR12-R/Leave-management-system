@@ -24,6 +24,7 @@ C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-managem
 C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\security\UserDetailsImpl.java
 C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\model\RoleName.java
 C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\controller\AdminController.java
+C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\payload\UserSummaryDTO.java
 C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\service\LeaveService.java
 C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\model\LeaveBalance.java
 C:\Users\rnave\OneDrive\Documents\Projects\Leave Management System\Leave-management-system\backend\src\main\java\com\leavemanagement\controller\LeaveController.java

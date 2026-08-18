@@ -9,4 +9,5 @@ public class TimeOffRequestDTO {
     private LocalDate startDate;
     private LocalDate endDate;
     private String reason;
+    private Boolean isCompanySponsored;
 }
