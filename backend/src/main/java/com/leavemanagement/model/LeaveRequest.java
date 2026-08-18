@@ -24,14 +24,22 @@ public class LeaveRequest {
     private User applicant;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "approver_id")
-    private User approver;
+    @JoinColumn(name = "manager_approver_id")
+    private User managerApprover;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hr_approver_id")
+    private User hrApprover;
 
     private LocalDate startDate;
     
     private LocalDate endDate;
+    
+    private Double totalDays;
+    
+    private String leaveType; // SICK, CASUAL, ANNUAL, UNPAID
 
-    private String status; // PENDING, APPROVED, REJECTED, WITHDRAWN
+    private String status; // PENDING_MANAGER, PENDING_HR, APPROVED, REJECTED, WITHDRAWN
 
     private String reason;
 }
