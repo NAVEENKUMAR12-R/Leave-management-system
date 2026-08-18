@@ -18,5 +18,6 @@ public class TimeOffResponseDTO {
     private String payStatus; // "COMPANY_SPONSORED", "UNPAID_LEAVE_OF_ABSENCE"
     private Boolean salaryCredited;
     private String payStatusLabel; // "Company Sponsored (Salary Credited)" vs "Unpaid Leave of Absence (No Salary)"
+    private String reason;
 }
 

@@ -27,6 +27,18 @@ export default function AdminPolicyPanel() {
 
   useEffect(() => {
     fetchPolicies();
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const eventSource = new EventSource(`http://localhost:8080/api/events/subscribe?token=${encodeURIComponent(token)}`);
+    eventSource.addEventListener('POLICY_UPDATE', () => {
+      fetchPolicies();
+    });
+
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
   const fetchPolicies = async () => {
@@ -92,7 +104,7 @@ export default function AdminPolicyPanel() {
     nextYear.setFullYear(today.getFullYear() + 1);
 
     setEditing({
-      policyName: 'New Absence Policy',
+      policyName: 'New Leave Policy',
       leaveType: 'ANNUAL',
       effectiveDate: today.toISOString().split('T')[0],
       endDate: nextYear.toISOString().split('T')[0],
@@ -205,7 +217,7 @@ export default function AdminPolicyPanel() {
         <div className="card-header">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h2 className="card-title" style={{ margin: 0 }}>Absence Management Policy Engine</h2>
+              <h2 className="card-title" style={{ margin: 0 }}>Leave Management Policy Engine</h2>
               <span style={{
                 background: 'var(--wd-green-light)',
                 color: 'var(--wd-green)',
@@ -506,9 +518,9 @@ export default function AdminPolicyPanel() {
           <div className="modal-content" style={{ maxWidth: '780px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2 className="modal-title">{editing.id ? 'Edit' : 'Create'} Dynamic Absence Policy</h2>
+                <h2 className="modal-title">{editing.id ? 'Edit' : 'Create'} Dynamic Leave Policy</h2>
                 <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-                  Workday-style Absence Management Policy Configuration Engine
+                  Leave Management Policy Configuration Engine
                 </div>
               </div>
               <button className="modal-close" onClick={() => setShowForm(false)}>✕</button>

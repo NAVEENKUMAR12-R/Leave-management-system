@@ -17,7 +17,7 @@ export default function Sidebar() {
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : 'U';
 
-  const roleLabel = isAdmin ? 'HR Admin' : isHR ? 'HR' : isManager ? 'Manager' : 'Employee';
+  const roleLabel = isAdmin ? 'HR Admin' : isHR ? 'HR Specialist' : isManager ? 'Manager' : 'Employee';
 
   return (
     <aside className="sidebar">
@@ -25,7 +25,7 @@ export default function Sidebar() {
         <div className="sidebar-brand-icon">L</div>
         <div>
           <div className="sidebar-brand-text">Leave Hub</div>
-          <div className="sidebar-brand-sub">Leave Management</div>
+          <div className="sidebar-brand-sub">Leave Management System</div>
         </div>
       </div>
 
@@ -39,12 +39,12 @@ export default function Sidebar() {
 
         <Link to="/history" className={`sidebar-link ${isActive('/history') ? 'active' : ''}`}>
           <span className="link-icon">📜</span>
-          Leave Records & History
+          Leave History
         </Link>
 
         {(isManager || isHR) && (
           <>
-            <div className="sidebar-section-title" style={{ marginTop: 16 }}>Team</div>
+            <div className="sidebar-section-title" style={{ marginTop: 12 }}>Team</div>
             <Link to="/inbox" className={`sidebar-link ${isActive('/inbox') ? 'active' : ''}`}>
               <span className="link-icon">📥</span>
               Inbox & Approvals
@@ -52,13 +52,19 @@ export default function Sidebar() {
           </>
         )}
 
-        {isAdmin && (
+        {(isAdmin || isHR) && (
           <>
-            <div className="sidebar-section-title" style={{ marginTop: 16 }}>Administration</div>
-            <Link to="/admin/policies" className={`sidebar-link ${isActive('/admin/policies') ? 'active' : ''}`}>
-              <span className="link-icon">⚙️</span>
-              Policy Configuration
+            <div className="sidebar-section-title" style={{ marginTop: 12 }}>Administration</div>
+            <Link to="/admin/employees" className={`sidebar-link ${isActive('/admin/employees') ? 'active' : ''}`}>
+              <span className="link-icon">👥</span>
+              Employee Directory & Onboarding
             </Link>
+            {isAdmin && (
+              <Link to="/admin/policies" className={`sidebar-link ${isActive('/admin/policies') ? 'active' : ''}`}>
+                <span className="link-icon">⚙️</span>
+                Policy Configuration
+              </Link>
+            )}
           </>
         )}
       </nav>

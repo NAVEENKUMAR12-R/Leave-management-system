@@ -3,6 +3,7 @@ package com.leavemanagement.payload;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -14,4 +15,23 @@ public class UserSummaryDTO {
     private String email;
     private List<String> roles;
     private String managerName;
+    private Long managerId;
+    private String department;
+    private String designation;
+    private String employeeType;
+    private LocalDate hireDate;
+
+    public UserSummaryDTO(Long id, String name, String email) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    public UserSummaryDTO(Long id, String name, String email, List<String> roles, String managerName) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.roles = roles;
+        this.managerName = managerName;
+    }
 }

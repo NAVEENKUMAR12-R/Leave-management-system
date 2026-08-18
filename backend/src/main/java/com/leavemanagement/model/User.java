@@ -30,6 +30,11 @@ public class User {
     @JsonIgnore // don't serialize password
     private String password;
 
+    private String department;
+    private String designation;
+    private String employeeType;
+    private java.time.LocalDate hireDate;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")
     @JsonIgnore // Prevent infinite recursion when serializing

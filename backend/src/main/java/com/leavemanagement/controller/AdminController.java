@@ -14,9 +14,12 @@ import java.util.List;
 public class AdminController {
 
     private final LeavePolicyRepository leavePolicyRepository;
+    private final com.leavemanagement.service.SseEmitterService sseEmitterService;
 
-    public AdminController(LeavePolicyRepository leavePolicyRepository) {
+    public AdminController(LeavePolicyRepository leavePolicyRepository,
+                           com.leavemanagement.service.SseEmitterService sseEmitterService) {
         this.leavePolicyRepository = leavePolicyRepository;
+        this.sseEmitterService = sseEmitterService;
     }
 
     @GetMapping
@@ -28,7 +31,9 @@ public class AdminController {
     @PostMapping
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<LeavePolicy> createOrUpdatePolicy(@RequestBody LeavePolicy policy) {
-        return ResponseEntity.ok(leavePolicyRepository.save(policy));
+        LeavePolicy saved = leavePolicyRepository.save(policy);
+        sseEmitterService.broadcast("POLICY_UPDATE", saved);
+        return ResponseEntity.ok(saved);
     }
 
     @PostMapping("/{id}/restart")
@@ -88,7 +93,9 @@ public class AdminController {
         newPolicy.setAllowSpecialExceptions(oldPolicy.getAllowSpecialExceptions());
         newPolicy.setReportFrequency(oldPolicy.getReportFrequency());
 
-        return ResponseEntity.ok(leavePolicyRepository.save(newPolicy));
+        LeavePolicy savedRenewed = leavePolicyRepository.save(newPolicy);
+        sseEmitterService.broadcast("POLICY_UPDATE", savedRenewed);
+        return ResponseEntity.ok(savedRenewed);
     }
 
     @DeleteMapping("/{id}")
@@ -101,6 +108,7 @@ public class AdminController {
 
         if (permanent) {
             leavePolicyRepository.delete(policy);
+            sseEmitterService.broadcast("POLICY_UPDATE", java.util.Map.of("deletedId", id, "permanent", true));
             return ResponseEntity.ok().body(java.util.Map.of("message", "Policy permanently removed"));
         } else {
             // Soft delete / Move to Policy History
@@ -109,9 +117,9 @@ public class AdminController {
             if (policy.getEndDate() == null || policy.getEndDate().isAfter(java.time.LocalDate.now())) {
                 policy.setEndDate(java.time.LocalDate.now());
             }
-            leavePolicyRepository.save(policy);
+            LeavePolicy archived = leavePolicyRepository.save(policy);
+            sseEmitterService.broadcast("POLICY_UPDATE", archived);
             return ResponseEntity.ok().body(java.util.Map.of("message", "Policy archived to history successfully"));
         }
     }
 }
-

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
 import api from '../api';
-import type { TimeOffResponse, UserSummary } from '../types';
+import type { TimeOffResponse, UserSummary, LeaveBalanceInfo } from '../types';
+import ExtendLeaveModal from './ExtendLeaveModal';
 
 type HistoryScope = 'MY' | 'TEAM' | 'ORG';
 
@@ -16,6 +17,8 @@ export default function LeaveHistory() {
   // Data states
   const [leaves, setLeaves] = useState<TimeOffResponse[]>([]);
   const [employees, setEmployees] = useState<UserSummary[]>([]);
+  const [balances, setBalances] = useState<LeaveBalanceInfo[]>([]);
+  const [extendingLeave, setExtendingLeave] = useState<TimeOffResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -38,6 +41,9 @@ export default function LeaveHistory() {
     setSelectedStatus('ALL');
 
     try {
+      const balRes = await api.get('/leaves/my-balances');
+      setBalances(balRes.data || []);
+
       if (scope === 'MY') {
         const res = await api.get('/leaves/history/my');
         setLeaves(res.data);
@@ -128,46 +134,56 @@ export default function LeaveHistory() {
     try {
       await api.put(`/leaves/${id}/withdraw`);
       fetchDataForScope(activeTab);
-    } catch (err) {
+    } catch {
       alert('Failed to withdraw leave request.');
     }
   };
 
+  const getInitials = (name: string) =>
+    name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+
+  const getTypeColor = (type: string) => {
+    switch (type.toUpperCase()) {
+      case 'ANNUAL': return 'var(--wd-blue)';
+      case 'SICK': return 'var(--wd-green)';
+      case 'CASUAL': return 'var(--wd-orange)';
+      case 'EARNED': return 'var(--wd-purple)';
+      default: return 'var(--wd-blue)';
+    }
+  };
+
+  const tabItems: { key: HistoryScope; label: string; icon: string; show: boolean }[] = [
+    { key: 'MY', label: 'My History', icon: '👤', show: true },
+    { key: 'TEAM', label: 'Team History', icon: '👥', show: isManager },
+    { key: 'ORG', label: 'Organization', icon: '🏢', show: isHR },
+  ];
+
   return (
     <>
-      {/* Scope Navigation Tabs for Managers & HR */}
+      {/* Scope Navigation Tabs */}
       {(isManager || isHR) && (
         <div style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--border-default)',
-          paddingBottom: '12px'
+          display: 'flex', gap: 6, marginBottom: 24,
+          background: 'var(--bg-card)', padding: '6px',
+          borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)',
+          width: 'fit-content', boxShadow: 'var(--shadow-xs)'
         }}>
-          <button
-            className={`btn ${activeTab === 'MY' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('MY')}
-          >
-            👤 My Personal History
-          </button>
-
-          {isManager && (
+          {tabItems.filter(t => t.show).map(t => (
             <button
-              className={`btn ${activeTab === 'TEAM' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('TEAM')}
+              key={t.key}
+              className="btn"
+              onClick={() => setActiveTab(t.key)}
+              style={{
+                background: activeTab === t.key ? 'var(--wd-blue-gradient)' : 'transparent',
+                color: activeTab === t.key ? 'white' : 'var(--text-secondary)',
+                boxShadow: activeTab === t.key ? 'var(--shadow-blue)' : 'none',
+                padding: '8px 16px', fontSize: 'var(--font-size-sm)',
+                borderRadius: 'var(--radius-md)'
+              }}
             >
-              👥 My Subordinates & Team History
+              {t.icon} {t.label}
             </button>
-          )}
-
-          {isHR && (
-            <button
-              className={`btn ${activeTab === 'ORG' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('ORG')}
-            >
-              🏢 Company-Wide Employee History
-            </button>
-          )}
+          ))}
         </div>
       )}
 
@@ -181,11 +197,11 @@ export default function LeaveHistory() {
         </div>
         <div className="stat-card green">
           <div className="stat-label">Approved Paid Days</div>
-          <div className="stat-value">{stats.paidDays} <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>days</span></div>
+          <div className="stat-value">{stats.paidDays} <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>days</span></div>
         </div>
         <div className="stat-card red">
           <div className="stat-label">Unpaid (LOP) Days</div>
-          <div className="stat-value">{stats.unpaidDays} <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>days</span></div>
+          <div className="stat-value">{stats.unpaidDays} <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>days</span></div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Approved Requests</div>
@@ -201,15 +217,15 @@ export default function LeaveHistory() {
               {activeTab === 'MY'
                 ? 'My Personal Leave History'
                 : activeTab === 'TEAM'
-                ? 'Direct Subordinates’ Leave History'
-                : 'All Organization Employees’ Leave History'}
+                  ? 'Direct Subordinates\' Leave History'
+                  : 'All Organization Employees\' Leave History'}
             </div>
             <div className="card-subtitle">
               {activeTab === 'MY'
                 ? 'All your past and upcoming leave applications'
                 : activeTab === 'TEAM'
-                ? 'Leave records of employees who report directly to you'
-                : 'Complete leave records across all departments'}
+                  ? 'Leave records of employees who report directly to you'
+                  : 'Complete leave records across all departments'}
             </div>
           </div>
           <button className="btn btn-secondary btn-sm" onClick={() => fetchDataForScope(activeTab)}>
@@ -219,12 +235,12 @@ export default function LeaveHistory() {
 
         {/* Filter Controls Bar */}
         <div style={{
-          padding: '16px 24px',
-          background: 'var(--bg-hover)',
+          padding: '14px 24px',
+          background: 'var(--bg-subtle)',
           borderBottom: '1px solid var(--border-default)',
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '12px',
+          gap: '10px',
           alignItems: 'center'
         }}>
           {/* Search Box */}
@@ -278,28 +294,28 @@ export default function LeaveHistory() {
           </div>
 
           {/* Pay Status Filter */}
-          <div style={{ minWidth: '160px' }}>
+          <div style={{ minWidth: '140px' }}>
             <select
               className="form-select"
               style={{ marginBottom: 0 }}
               value={selectedPayStatus}
               onChange={e => setSelectedPayStatus(e.target.value)}
             >
-              <option value="ALL">All Pay Statuses</option>
-              <option value="PAID">● Paid (Salary Credited)</option>
-              <option value="UNPAID">○ Unpaid (No Salary / LOP)</option>
+              <option value="ALL">All Pay</option>
+              <option value="PAID">● Paid</option>
+              <option value="UNPAID">○ Unpaid (LOP)</option>
             </select>
           </div>
 
           {/* Routing Status Filter */}
-          <div style={{ minWidth: '150px' }}>
+          <div style={{ minWidth: '140px' }}>
             <select
               className="form-select"
               style={{ marginBottom: 0 }}
               value={selectedStatus}
               onChange={e => setSelectedStatus(e.target.value)}
             >
-              <option value="ALL">All Approval Statuses</option>
+              <option value="ALL">All Statuses</option>
               <option value="APPROVED">Approved</option>
               <option value="PENDING_MANAGER">Pending Manager</option>
               <option value="PENDING_HR">Pending HR</option>
@@ -313,8 +329,13 @@ export default function LeaveHistory() {
         <div className="card-body-compact">
           {loading ? (
             <div className="empty-state">
-              <div className="empty-state-icon">⏳</div>
+              <div style={{
+                width: 32, height: 32, border: '3px solid var(--border-default)',
+                borderTopColor: 'var(--wd-blue)', borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite', margin: '0 auto 12px'
+              }} />
               <div className="empty-state-text">Loading leave records…</div>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           ) : filteredLeaves.length === 0 ? (
             <div className="empty-state">
@@ -323,8 +344,8 @@ export default function LeaveHistory() {
                 {activeTab === 'MY'
                   ? 'You have no leave records matching the filters.'
                   : activeTab === 'TEAM'
-                  ? 'No subordinates have leave records matching the filters.'
-                  : 'No organization leave records match the filters.'}
+                    ? 'No subordinates have leave records matching the filters.'
+                    : 'No organization leave records match the filters.'}
               </div>
             </div>
           ) : (
@@ -334,9 +355,9 @@ export default function LeaveHistory() {
                   <th>Employee</th>
                   <th>Leave Category</th>
                   <th>Date Range</th>
-                  <th>Working Days</th>
+                  <th>Days</th>
                   <th>Pay Status</th>
-                  <th>Workflow Status</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -344,51 +365,57 @@ export default function LeaveHistory() {
                 {filteredLeaves.map(l => {
                   const isOwner = user?.id?.toString() === l.workerId;
                   const isPending = l.routingStatus === 'PENDING_MANAGER' || l.routingStatus === 'PENDING_HR';
+                  const typeColor = getTypeColor(l.timeOffType);
 
                   return (
                     <tr key={l.id}>
                       <td>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {l.workerName || `Worker #${l.workerId}`}
-                        </div>
-                        {isOwner && (
-                          <span style={{ fontSize: '10px', color: 'var(--wd-blue)', fontWeight: 600 }}>
-                            (You)
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{
+                            width: 30, height: 30, borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 'var(--font-size-2xs)', fontWeight: 700, flexShrink: 0
+                          }}>
+                            {getInitials(l.workerName || '')}
                           </span>
-                        )}
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                              {l.workerName || `Worker #${l.workerId}`}
+                            </div>
+                            {isOwner && (
+                              <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--wd-blue)', fontWeight: 600 }}>
+                                (You)
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td>
                         <span style={{
-                          fontWeight: 600,
-                          padding: '3px 8px',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--bg-hover)',
-                          fontSize: 'var(--font-size-xs)'
+                          fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                          fontSize: 'var(--font-size-xs)',
+                          background: `${typeColor}10`, color: typeColor,
+                          border: `1px solid ${typeColor}20`
                         }}>
                           {l.timeOffType}
                         </span>
                       </td>
-                      <td>
-                        <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
-                          {l.startDate} <span style={{ color: 'var(--text-tertiary)' }}>→</span> {l.endDate}
-                        </div>
+                      <td style={{ fontWeight: 500, fontSize: 'var(--font-size-sm)' }}>
+                        {l.startDate} <span style={{ color: 'var(--text-tertiary)' }}>→</span> {l.endDate}
                       </td>
                       <td style={{ fontWeight: 700 }}>
-                        {l.totalQuantity} {l.totalQuantity === 1 ? 'day' : 'days'}
+                        {l.totalQuantity}
                       </td>
                       <td>
                         <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 10px',
-                          borderRadius: 'var(--radius-full)',
-                          fontSize: 'var(--font-size-xs)',
-                          fontWeight: 600,
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                          fontSize: 'var(--font-size-xs)', fontWeight: 600,
                           background: l.isCompanySponsored !== false ? 'var(--wd-green-light)' : 'var(--wd-orange-light)',
                           color: l.isCompanySponsored !== false ? 'var(--wd-green)' : 'var(--wd-orange)'
                         }}>
-                          {l.isCompanySponsored !== false ? '● Company Sponsored (Paid)' : '○ Unpaid (No Salary / LOP)'}
+                          {l.isCompanySponsored !== false ? '● Paid' : '○ LOP'}
                         </span>
                       </td>
                       <td>
@@ -397,15 +424,30 @@ export default function LeaveHistory() {
                         </span>
                       </td>
                       <td>
-                        {isOwner && isPending && (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => withdrawLeave(l.id)}
-                            title="Withdraw request"
-                          >
-                            Withdraw
-                          </button>
-                        )}
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {isOwner && (l.routingStatus === 'APPROVED' || isPending) && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => setExtendingLeave(l)}
+                              style={{ padding: '3px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                              title="Extend leave request"
+                            >
+                              🔄 Extend
+                            </button>
+                          )}
+                          {isOwner && isPending && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => withdrawLeave(l.id)}
+                              style={{ padding: '3px 8px', fontSize: '11px' }}
+                              title="Withdraw request"
+                            >
+                              Withdraw
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -415,6 +457,18 @@ export default function LeaveHistory() {
           )}
         </div>
       </div>
+
+      {extendingLeave && (
+        <ExtendLeaveModal
+          leave={extendingLeave}
+          balances={balances}
+          onClose={() => setExtendingLeave(null)}
+          onExtended={() => {
+            setExtendingLeave(null);
+            fetchDataForScope(activeTab);
+          }}
+        />
+      )}
     </>
   );
 }

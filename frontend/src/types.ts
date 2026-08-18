@@ -28,6 +28,7 @@ export interface TimeOffResponse {
   payStatus?: string;
   salaryCredited?: boolean;
   payStatusLabel?: string;
+  reason?: string;
 }
 
 export interface Holiday {
@@ -42,6 +43,10 @@ export interface LeaveBalanceInfo {
   leaveType: string;
   totalLeaves: number;
   usedLeaves: number;
+  accruedLeaves?: number;
+  availableLeaves?: number;
+  accrualRate?: number;
+  accrualFrequency?: string;
 }
 
 export interface LeavePolicyInfo {
@@ -105,5 +110,22 @@ export interface UserSummary {
   email: string;
   roles: string[];
   managerName?: string;
+  managerId?: number;
+  department?: string;
+  designation?: string;
+  employeeType?: string;
+  hireDate?: string;
+}
+
+export interface OnboardEmployeePayload {
+  name: string;
+  email: string;
+  password?: string;
+  roles: string[];
+  managerId?: number | null;
+  department?: string;
+  designation?: string;
+  employeeType?: string;
+  hireDate?: string;
 }
 

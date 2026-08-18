@@ -8,16 +8,31 @@ export default function TeamInbox() {
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const [pendingLeaves, setPendingLeaves] = useState<TimeOffResponse[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const getTodayLocal = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [dateFilter, setDateFilter] = useState(getTodayLocal);
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
-
-  const isHR = hasRole('ROLE_HR') || hasRole('ROLE_HR_ADMIN');
-
   const [allLeaves, setAllLeaves] = useState<TimeOffResponse[]>([]);
+  const [processing, setProcessing] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPendingLeaves();
     fetchStats();
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const eventSource = new EventSource(`http://localhost:8080/api/events/subscribe?token=${encodeURIComponent(token)}`);
+    eventSource.addEventListener('LEAVE_UPDATE', () => {
+      fetchPendingLeaves();
+      fetchStats();
+    });
+
+    return () => {
+      eventSource.close();
+    };
   }, [dateFilter, tab]);
 
   const fetchPendingLeaves = async () => {
@@ -44,18 +59,26 @@ export default function TeamInbox() {
   };
 
   const processLeave = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    setProcessing(id);
     try {
       await api.put(`/leaves/${id}/process`, { action });
       fetchPendingLeaves();
       fetchStats();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to process leave.');
+    } finally {
+      setProcessing(null);
     }
+  };
+
+  const getDateObj = (dStr: string) => {
+    const [y, m, d] = dStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
   };
 
   // Generate week range for week mode
   const getWeekLabel = () => {
-    const d = new Date(dateFilter);
+    const d = getDateObj(dateFilter);
     const day = d.getDay();
     const start = new Date(d);
     start.setDate(d.getDate() - day);
@@ -63,6 +86,9 @@ export default function TeamInbox() {
     end.setDate(start.getDate() + 6);
     return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   };
+
+  const getInitials = (name: string) =>
+    name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
 
   return (
     <>
@@ -82,7 +108,9 @@ export default function TeamInbox() {
         </div>
         <div className="stat-card">
           <div className="stat-label">Pending Approvals</div>
-          <div className="stat-value">{pendingLeaves.length}</div>
+          <div className="stat-value" style={{ color: pendingLeaves.length > 0 ? 'var(--wd-orange)' : 'var(--text-primary)' }}>
+            {pendingLeaves.length}
+          </div>
         </div>
       </div>
 
@@ -92,9 +120,9 @@ export default function TeamInbox() {
           <div>
             <div className="card-title">Team Availability</div>
             <div className="card-subtitle">
-              {viewMode === 'day' && new Date(dateFilter).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              {viewMode === 'day' && getDateObj(dateFilter).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               {viewMode === 'week' && getWeekLabel()}
-              {viewMode === 'month' && new Date(dateFilter).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              {viewMode === 'month' && getDateObj(dateFilter).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -108,9 +136,22 @@ export default function TeamInbox() {
         </div>
         <div className="card-body">
           {stats?.onLeaveNames && stats.onLeaveNames.length > 0 ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
               {stats.onLeaveNames.map((name, i) => (
-                <span key={i} style={{ background: 'var(--wd-red-light)', color: 'var(--wd-red)', padding: '6px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{name}</span>
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: 'var(--wd-red-light)', padding: '6px 14px 6px 8px',
+                  borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--wd-red)'
+                }}>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: '50%', background: 'var(--wd-red)',
+                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 'var(--font-size-2xs)', fontWeight: 700
+                  }}>
+                    {getInitials(name)}
+                  </span>
+                  {name}
+                </div>
               ))}
             </div>
           ) : (
@@ -139,7 +180,7 @@ export default function TeamInbox() {
             if (displayLeaves.length === 0) {
               return (
                 <div className="empty-state">
-                  <div className="empty-state-icon">✅</div>
+                  <div className="empty-state-icon">{tab === 'pending' ? '✅' : '📂'}</div>
                   <div className="empty-state-text">
                     {tab === 'pending' ? 'All caught up! No pending requests.' : 'No processed requests found.'}
                   </div>
@@ -154,6 +195,7 @@ export default function TeamInbox() {
                     <th>Type</th>
                     <th>Date Range</th>
                     <th>Days</th>
+                    <th>Reason</th>
                     <th>Pay Status</th>
                     <th>Workflow Stage</th>
                     <th>Actions</th>
@@ -162,44 +204,87 @@ export default function TeamInbox() {
                 <tbody>
                   {displayLeaves.map(l => {
                     const isPending = l.routingStatus === 'PENDING_MANAGER' || l.routingStatus === 'PENDING_HR' || l.routingStatus === 'PENDING_ADMIN';
+                    const isProcessingThis = processing === l.id;
                     return (
                       <tr key={l.id}>
-                        <td style={{ fontWeight: 600 }}>{l.workerName || `Worker #${l.workerId}`}</td>
                         <td>
-                          <span style={{ fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-hover)', fontSize: 'var(--font-size-xs)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{
+                              width: 32, height: 32, borderRadius: '50%',
+                              background: 'linear-gradient(135deg, #0875e1, #6b46c1)',
+                              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 'var(--font-size-2xs)', fontWeight: 700, flexShrink: 0
+                            }}>
+                              {getInitials(l.workerName || '')}
+                            </span>
+                            <span style={{ fontWeight: 600 }}>{l.workerName || `Worker #${l.workerId}`}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{
+                            fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                            background: 'var(--bg-hover)', fontSize: 'var(--font-size-xs)'
+                          }}>
                             {l.timeOffType}
                           </span>
                         </td>
-                        <td>{l.startDate} → {l.endDate}</td>
+                        <td style={{ fontWeight: 500 }}>{l.startDate} → {l.endDate}</td>
                         <td style={{ fontWeight: 700 }}>{l.totalQuantity} {l.totalQuantity === 1 ? 'day' : 'days'}</td>
                         <td>
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 8px',
-                            borderRadius: 'var(--radius-full)',
+                          <div style={{
+                            maxWidth: 200,
                             fontSize: 'var(--font-size-xs)',
-                            fontWeight: 600,
+                            color: 'var(--text-secondary)',
+                            lineHeight: 1.4,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }} title={l.reason || 'No reason provided'}>
+                            {l.reason ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ opacity: 0.7 }}>💬</span> {l.reason}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>— None —</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '4px',
+                            padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                            fontSize: 'var(--font-size-xs)', fontWeight: 600,
                             background: l.isCompanySponsored !== false ? 'var(--wd-green-light)' : 'var(--wd-orange-light)',
                             color: l.isCompanySponsored !== false ? 'var(--wd-green)' : 'var(--wd-orange)'
                           }}>
-                            {l.isCompanySponsored !== false ? '● Paid (Salary Credited)' : '○ Unpaid (No Salary / LOP)'}
+                            {l.isCompanySponsored !== false ? '● Paid' : '○ Unpaid (LOP)'}
                           </span>
                         </td>
                         <td>
                           <span className={`status-badge status-${l.routingStatus.toLowerCase()}`}>
-                            {l.routingStatus === 'PENDING_ADMIN' ? 'Pending Admin (HR Request)' : l.routingStatus.replace('_', ' ')}
+                            {l.routingStatus === 'PENDING_ADMIN' ? 'Pending Admin' : l.routingStatus.replace('_', ' ')}
                           </span>
                         </td>
                         <td>
                           {isPending ? (
                             <div className="table-actions">
-                              <button className="btn btn-success btn-sm" onClick={() => processLeave(l.id, 'APPROVE')}>Approve</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => processLeave(l.id, 'REJECT')}>Deny</button>
+                              <button
+                                className="btn btn-success btn-sm"
+                                onClick={() => processLeave(l.id, 'APPROVE')}
+                                disabled={isProcessingThis}
+                              >
+                                {isProcessingThis ? '...' : 'Approve'}
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => processLeave(l.id, 'REJECT')}
+                                disabled={isProcessingThis}
+                              >
+                                Deny
+                              </button>
                             </div>
                           ) : (
-                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Completed</span>
+                            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)', fontWeight: 500 }}>Completed</span>
                           )}
                         </td>
                       </tr>

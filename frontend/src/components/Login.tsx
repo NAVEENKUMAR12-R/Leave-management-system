@@ -32,7 +32,7 @@ export default function Login() {
           <span className="login-logo-text">Leave Hub</span>
         </div>
         <h1 className="login-title">Welcome back</h1>
-        <p className="login-subtitle">Sign in to manage your time off</p>
+        <p className="login-subtitle">Sign in to your leave management portal</p>
 
         {error && (
           <div className="alert alert-error">
@@ -66,17 +66,47 @@ export default function Login() {
               required
             />
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, fontSize: 'var(--font-size-xs)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input type="checkbox" style={{ accentColor: 'var(--wd-blue)' }} />
+              Remember me
+            </label>
+            <a href="#" onClick={e => e.preventDefault()} style={{ color: 'var(--wd-blue)', fontWeight: 600 }}>Forgot password?</a>
+          </div>
+
           <button
             id="login-submit"
             type="submit"
             className="btn btn-primary btn-lg"
-            style={{ width: '100%', marginTop: 8 }}
+            style={{ width: '100%' }}
             disabled={isLoading}
           >
-            {isLoading ? 'Signing in…' : 'Sign In'}
+            {isLoading ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ 
+                  width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', 
+                  borderTopColor: 'white', borderRadius: '50%',
+                  animation: 'spin 0.6s linear infinite', display: 'inline-block'
+                }} />
+                Signing in…
+              </span>
+            ) : 'Sign In'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-default)' }}>
+          <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)' }}>
+            Leave Management System · © {new Date().getFullYear()} Leave Hub
+          </p>
+        </div>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
