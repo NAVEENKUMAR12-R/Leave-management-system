@@ -263,15 +263,91 @@ public class LeaveService {
                 .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    public com.leavemanagement.payload.UserSummaryDTO getUserSummaryWithLeaveStats(User u) {
+        com.leavemanagement.payload.UserSummaryDTO dto = new com.leavemanagement.payload.UserSummaryDTO();
+        dto.setId(u.getId());
+        dto.setName(u.getName());
+        dto.setEmail(u.getEmail());
+        dto.setRoles(u.getRoles().stream().map(r -> "ROLE_" + r.getRole().name()).collect(Collectors.toList()));
+        dto.setManagerName(u.getManager() != null ? u.getManager().getName() : null);
+        dto.setManagerId(u.getManager() != null ? u.getManager().getId() : null);
+        dto.setDepartment(u.getDepartment());
+        dto.setDesignation(u.getDesignation());
+        dto.setEmployeeType(u.getEmployeeType());
+        dto.setHireDate(u.getHireDate());
+
+        // Calculate PTO Balances
+        List<LeaveBalance> balances = leaveBalanceRepository.findByUserId(u.getId());
+        double totalPtoAllocated = 0.0;
+        double totalPtoUsed = 0.0;
+        double totalPtoAvailable = 0.0;
+
+        int currentMonth = LocalDate.now().getMonthValue();
+        List<com.leavemanagement.payload.LeaveBalanceDTO> balanceDTOs = new java.util.ArrayList<>();
+
+        for (LeaveBalance b : balances) {
+            double total = b.getTotalLeaves() != null ? b.getTotalLeaves() : 0.0;
+            double used = b.getUsedLeaves() != null ? b.getUsedLeaves() : 0.0;
+
+            com.leavemanagement.model.LeavePolicy policy = leavePolicyRepository
+                    .findByLeaveType(b.getLeaveType())
+                    .orElse(null);
+
+            String frequency = policy != null && policy.getAccrualFrequency() != null
+                    ? policy.getAccrualFrequency()
+                    : ("CASUAL".equalsIgnoreCase(b.getLeaveType()) ? "ANNUAL" : "MONTHLY");
+
+            Double rate = policy != null && policy.getAccrualRate() != null
+                    ? policy.getAccrualRate()
+                    : (total > 0 ? Math.round((total / 12.0) * 100.0) / 100.0 : 1.0);
+
+            double accrued = "MONTHLY".equalsIgnoreCase(frequency)
+                    ? Math.min(total, Math.round(currentMonth * rate * 100.0) / 100.0)
+                    : total;
+            double available = Math.max(0.0, Math.round((accrued - used) * 100.0) / 100.0);
+
+            totalPtoAllocated += total;
+            totalPtoUsed += used;
+            totalPtoAvailable += available;
+
+            balanceDTOs.add(new com.leavemanagement.payload.LeaveBalanceDTO(
+                    b.getId(),
+                    b.getLeaveType(),
+                    total,
+                    used,
+                    accrued,
+                    available,
+                    rate,
+                    frequency
+            ));
+        }
+
+        // Calculate Non-Paid Off (Unpaid / LOP) from approved leave requests
+        List<LeaveRequest> userLeaves = leaveRequestRepository.findByApplicantId(u.getId());
+        double totalUnpaidDays = userLeaves.stream()
+                .filter(lr -> "APPROVED".equalsIgnoreCase(lr.getStatus()))
+                .filter(lr -> Boolean.FALSE.equals(lr.getIsCompanySponsored()) || "UNPAID".equalsIgnoreCase(lr.getLeaveType()))
+                .mapToDouble(lr -> lr.getTotalDays() != null ? lr.getTotalDays() : 0.0)
+                .sum();
+
+        dto.setTotalPtoAllocated(Math.round(totalPtoAllocated * 100.0) / 100.0);
+        dto.setTotalPtoUsed(Math.round(totalPtoUsed * 100.0) / 100.0);
+        dto.setTotalPtoAvailable(Math.round(totalPtoAvailable * 100.0) / 100.0);
+        dto.setTotalUnpaidDays(Math.round(totalUnpaidDays * 100.0) / 100.0);
+        dto.setLeaveBalances(balanceDTOs);
+
+        return dto;
+    }
+
     public List<com.leavemanagement.payload.UserSummaryDTO> getDirectReportees(Long managerId) {
         return userRepository.findByManagerId(managerId).stream()
-                .map(u -> new com.leavemanagement.payload.UserSummaryDTO(u.getId(), u.getName(), u.getEmail()))
+                .map(this::getUserSummaryWithLeaveStats)
                 .collect(Collectors.toList());
     }
 
     public List<com.leavemanagement.payload.UserSummaryDTO> getAllEmployeesSummary() {
         return userRepository.findAll().stream()
-                .map(u -> new com.leavemanagement.payload.UserSummaryDTO(u.getId(), u.getName(), u.getEmail()))
+                .map(this::getUserSummaryWithLeaveStats)
                 .collect(Collectors.toList());
     }
 

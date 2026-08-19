@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import type { UserSummary } from '../types';
 import OnboardEmployeeModal from './OnboardEmployeeModal';
+import EmployeeDetailModal from './EmployeeDetailModal';
 
 export default function EmployeeDirectory() {
   const [employees, setEmployees] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOnboardModal, setShowOnboardModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<UserSummary | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [selectedDept, setSelectedDept] = useState('ALL');
@@ -23,6 +25,13 @@ export default function EmployeeDirectory() {
       setEmployees(res.data || []);
     } catch (err) {
       console.error('Failed to load employee directory', err);
+      // Fallback to /leaves/employees if needed
+      try {
+        const fb = await api.get('/leaves/employees');
+        setEmployees(fb.data || []);
+      } catch (e) {
+        console.error('Fallback employee fetch failed', e);
+      }
     } finally {
       setLoading(false);
     }
@@ -48,7 +57,8 @@ export default function EmployeeDirectory() {
         const matchName = e.name?.toLowerCase().includes(q);
         const matchEmail = e.email?.toLowerCase().includes(q);
         const matchDesignation = e.designation?.toLowerCase().includes(q);
-        if (!matchName && !matchEmail && !matchDesignation) return false;
+        const matchDept = e.department?.toLowerCase().includes(q);
+        if (!matchName && !matchEmail && !matchDesignation && !matchDept) return false;
       }
       if (selectedRole !== 'ALL') {
         const hasRole = e.roles?.some(r => r.toUpperCase().includes(selectedRole.toUpperCase()));
@@ -60,6 +70,21 @@ export default function EmployeeDirectory() {
       return true;
     });
   }, [employees, searchTerm, selectedRole, selectedDept]);
+
+  // Summary Metrics across all filtered workers
+  const summaryStats = useMemo(() => {
+    const totalWorkers = filteredEmployees.length;
+    const totalPtoAvailable = filteredEmployees.reduce((acc, curr) => acc + (curr.totalPtoAvailable ?? 0), 0);
+    const totalPtoUsed = filteredEmployees.reduce((acc, curr) => acc + (curr.totalPtoUsed ?? 0), 0);
+    const totalUnpaidDays = filteredEmployees.reduce((acc, curr) => acc + (curr.totalUnpaidDays ?? 0), 0);
+
+    return {
+      totalWorkers,
+      totalPtoAvailable: Math.round(totalPtoAvailable * 10) / 10,
+      totalPtoUsed: Math.round(totalPtoUsed * 10) / 10,
+      totalUnpaidDays: Math.round(totalUnpaidDays * 10) / 10,
+    };
+  }, [filteredEmployees]);
 
   const handleOnboardSuccess = (newEmp: UserSummary) => {
     setShowOnboardModal(false);
@@ -93,29 +118,61 @@ export default function EmployeeDirectory() {
         </div>
       )}
 
-      {/* Header & Quick Action */}
-      <div className="card animate-in" style={{ marginBottom: 20 }}>
+      {/* Overview Stat Cards */}
+      <div className="stats-grid animate-in" style={{ marginBottom: 20 }}>
+        <div className="stat-card blue">
+          <div className="stat-label">Total Workforce</div>
+          <div className="stat-value">{summaryStats.totalWorkers} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>workers</span></div>
+        </div>
+        <div className="stat-card green">
+          <div className="stat-label">Total Available PTO</div>
+          <div className="stat-value">{summaryStats.totalPtoAvailable} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>days</span></div>
+        </div>
+        <div className="stat-card" style={{ borderLeft: '4px solid var(--wd-orange)' }}>
+          <div className="stat-label">Total PTO Days Used</div>
+          <div className="stat-value">{summaryStats.totalPtoUsed} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>days</span></div>
+        </div>
+        <div className="stat-card red">
+          <div className="stat-label">Total Non-Paid Off (LOP)</div>
+          <div className="stat-value">{summaryStats.totalUnpaidDays} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>days</span></div>
+        </div>
+      </div>
+
+      {/* Header & Main Table Card */}
+      <div className="card animate-in animate-in-1">
         <div className="card-header" style={{ padding: '20px 24px' }}>
           <div>
             <div className="card-title" style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-              👥 Employee Directory & Onboarding
+              👥 Employee Directory & Leave Balances
               <span style={{
                 fontSize: '11px', fontWeight: 700, padding: '2px 8px',
                 borderRadius: 'var(--radius-full)', background: 'var(--wd-blue-50)', color: 'var(--wd-blue)'
               }}>
-                {employees.length} Total Workers
+                {filteredEmployees.length} Displayed
               </span>
             </div>
-            <div className="card-subtitle">Manage workforce organization hierarchy, role assignments, and onboard new team members</div>
+            <div className="card-subtitle">
+              View user details, role assignments, total Paid Time Off (PTO), and Non-Paid Off (LOP) metrics
+            </div>
           </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setShowOnboardModal(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <span>➕</span> Onboard New Employee
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={fetchEmployees}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              🔄 Refresh
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowOnboardModal(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <span>➕</span> Onboard Employee
+            </button>
+          </div>
         </div>
 
         {/* Filter Bar */}
@@ -134,7 +191,7 @@ export default function EmployeeDirectory() {
               className="form-input"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search by employee name, email, designation…"
+              placeholder="Search by employee name, email, designation, department…"
               style={{ fontSize: 'var(--font-size-xs)' }}
             />
           </div>
@@ -174,7 +231,7 @@ export default function EmployeeDirectory() {
           {loading ? (
             <div className="empty-state">
               <div className="empty-state-icon">⏳</div>
-              <div className="empty-state-text">Loading employee directory…</div>
+              <div className="empty-state-text">Loading employee directory & leave statistics…</div>
             </div>
           ) : filteredEmployees.length === 0 ? (
             <div className="empty-state">
@@ -186,88 +243,173 @@ export default function EmployeeDirectory() {
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Department & Designation</th>
-                  <th>Roles & Privileges</th>
+                  <th>Department & Role</th>
                   <th>Reporting Manager</th>
-                  <th>Employment Type</th>
-                  <th>Hire Date</th>
+                  <th>Paid Time Off (PTO)</th>
+                  <th>Non-Paid Off (LOP)</th>
+                  <th>Employment</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredEmployees.map(emp => (
-                  <tr key={emp.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #0055b3, #0284c7)',
-                          color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 700, fontSize: 'var(--font-size-xs)', flexShrink: 0
-                        }}>
-                          {getInitials(emp.name)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                            {emp.name}
+                {filteredEmployees.map(emp => {
+                  const ptoAvailable = emp.totalPtoAvailable ?? 0;
+                  const ptoAllocated = emp.totalPtoAllocated ?? 0;
+                  const ptoUsed = emp.totalPtoUsed ?? 0;
+                  const unpaidDays = emp.totalUnpaidDays ?? 0;
+
+                  return (
+                    <tr key={emp.id}>
+                      {/* Employee Info */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{
+                            width: 38, height: 38, borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #0055b3, #0284c7)',
+                            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: 700, fontSize: 'var(--font-size-xs)', flexShrink: 0
+                          }}>
+                            {getInitials(emp.name)}
                           </div>
-                          <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)' }}>
-                            {emp.email}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
+                              {emp.name}
+                            </div>
+                            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)' }}>
+                              {emp.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td>
-                      <div style={{ fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)' }}>
-                        {emp.department || 'General'}
-                      </div>
-                      <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-secondary)' }}>
-                        {emp.designation || 'Team Member'}
-                      </div>
-                    </td>
+                      {/* Department & Role */}
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)' }}>
+                          {emp.department || 'General'}
+                        </div>
+                        <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                          {emp.designation || 'Team Member'}
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {emp.roles?.map(r => getRoleBadge(r))}
+                        </div>
+                      </td>
 
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {emp.roles?.map(r => getRoleBadge(r))}
-                      </div>
-                    </td>
-
-                    <td>
-                      {emp.managerName ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 'var(--font-size-xs)' }}>👤</span>
-                          <span style={{ fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)' }}>
-                            {emp.managerName}
+                      {/* Reporting Manager */}
+                      <td>
+                        {emp.managerName ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 'var(--font-size-xs)' }}>👤</span>
+                            <span style={{ fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)' }}>
+                              {emp.managerName}
+                            </span>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-2xs)', fontStyle: 'italic' }}>
+                            Self / Executive
                           </span>
+                        )}
+                      </td>
+
+                      {/* Total Paid Time Off (PTO) */}
+                      <td>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                            <span style={{
+                              fontWeight: 700, fontSize: 'var(--font-size-xs)',
+                              padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                              background: 'var(--wd-green-light)', color: 'var(--wd-green)',
+                              border: '1px solid rgba(16, 185, 129, 0.2)'
+                            }}>
+                              ⚡ {ptoAvailable} / {ptoAllocated} Days
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                              ({ptoUsed} used)
+                            </span>
+                          </div>
+                          
+                          {/* Mini Category Badges */}
+                          {emp.leaveBalances && emp.leaveBalances.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+                              {emp.leaveBalances.map(b => (
+                                <span key={b.leaveType} style={{
+                                  fontSize: '10px', padding: '1px 6px', borderRadius: 'var(--radius-xs)',
+                                  background: 'var(--bg-subtle)', border: '1px solid var(--border-light)',
+                                  color: 'var(--text-secondary)'
+                                }}>
+                                  {b.leaveType.slice(0, 1).toUpperCase() + b.leaveType.slice(1).toLowerCase()}: {b.availableLeaves ?? (b.totalLeaves - b.usedLeaves)}/{b.totalLeaves}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-2xs)', fontStyle: 'italic' }}>
-                          Self / Top-level
-                        </span>
-                      )}
-                    </td>
+                      </td>
 
-                    <td>
-                      <span style={{
-                        fontSize: '11px', fontWeight: 600, padding: '3px 8px',
-                        borderRadius: 'var(--radius-sm)', background: 'var(--bg-subtle)',
-                        border: '1px solid var(--border-light)', color: 'var(--text-secondary)'
-                      }}>
-                        {emp.employeeType?.replace('_', ' ') || 'FULL TIME'}
-                      </span>
-                    </td>
+                      {/* Non-Paid Off (Unpaid / LOP) */}
+                      <td>
+                        {unpaidDays > 0 ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontWeight: 700, fontSize: 'var(--font-size-xs)',
+                            padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                            background: '#fef2f2', color: '#dc2626',
+                            border: '1px solid #fca5a5'
+                          }}>
+                            ⚠️ {unpaidDays} {unpaidDays === 1 ? 'day' : 'days'} LOP
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: 'var(--font-size-xs)', fontWeight: 500,
+                            padding: '3px 8px', borderRadius: 'var(--radius-full)',
+                            background: 'var(--bg-subtle)', color: 'var(--text-tertiary)',
+                            border: '1px solid var(--border-light)'
+                          }}>
+                            0 days LOP
+                          </span>
+                        )}
+                      </td>
 
-                    <td style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                      {emp.hireDate || '2026-01-01'}
-                    </td>
-                  </tr>
-                ))}
+                      {/* Employment Type & Hire Date */}
+                      <td>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {emp.employeeType?.replace('_', ' ') || 'FULL TIME'}
+                        </div>
+                        <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)' }}>
+                          Hired: {emp.hireDate || '2026-01-01'}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setSelectedEmployee(emp)}
+                          style={{ fontSize: '11px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          title="View detailed leave breakdown and profile"
+                        >
+                          <span>👁️</span> Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
       </div>
 
+      {/* Employee Detail Modal */}
+      {selectedEmployee && (
+        <EmployeeDetailModal
+          employee={selectedEmployee}
+          onClose={() => setSelectedEmployee(null)}
+        />
+      )}
+
+      {/* Onboard New Employee Modal */}
       {showOnboardModal && (
         <OnboardEmployeeModal
           onClose={() => setShowOnboardModal(false)}

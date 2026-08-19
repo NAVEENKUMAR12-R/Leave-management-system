@@ -115,6 +115,11 @@ export interface UserSummary {
   designation?: string;
   employeeType?: string;
   hireDate?: string;
+  totalPtoAllocated?: number;
+  totalPtoUsed?: number;
+  totalPtoAvailable?: number;
+  totalUnpaidDays?: number;
+  leaveBalances?: LeaveBalanceInfo[];
 }
 
 export interface OnboardEmployeePayload {

@@ -165,17 +165,6 @@ public class AdminEmployeeController {
     }
 
     private UserSummaryDTO mapToSummaryDTO(User u) {
-        UserSummaryDTO dto = new UserSummaryDTO();
-        dto.setId(u.getId());
-        dto.setName(u.getName());
-        dto.setEmail(u.getEmail());
-        dto.setRoles(u.getRoles().stream().map(r -> "ROLE_" + r.getRole().name()).collect(Collectors.toList()));
-        dto.setManagerName(u.getManager() != null ? u.getManager().getName() : null);
-        dto.setManagerId(u.getManager() != null ? u.getManager().getId() : null);
-        dto.setDepartment(u.getDepartment());
-        dto.setDesignation(u.getDesignation());
-        dto.setEmployeeType(u.getEmployeeType());
-        dto.setHireDate(u.getHireDate());
-        return dto;
+        return leaveService.getUserSummaryWithLeaveStats(u);
     }
 }

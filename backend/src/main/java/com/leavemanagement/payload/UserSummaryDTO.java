@@ -21,6 +21,13 @@ public class UserSummaryDTO {
     private String employeeType;
     private LocalDate hireDate;
 
+    // Leave & PTO statistics
+    private Double totalPtoAllocated;
+    private Double totalPtoUsed;
+    private Double totalPtoAvailable;
+    private Double totalUnpaidDays;
+    private List<LeaveBalanceDTO> leaveBalances;
+
     public UserSummaryDTO(Long id, String name, String email) {
         this.id = id;
         this.name = name;

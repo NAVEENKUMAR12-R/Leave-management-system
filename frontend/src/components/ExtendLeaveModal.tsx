@@ -39,7 +39,6 @@ export default function ExtendLeaveModal({ leave, balances, onClose, onExtended 
     return count;
   }, [minExtensionDate, newEndDate]);
 
-  const newTotalDays = leave.totalDays + additionalDays;
   const isPaid = leave.isCompanySponsored !== false && leave.timeOffType !== 'UNPAID';
   const isExceeding = isPaid && additionalDays > availableAccrued;
 
@@ -100,9 +99,6 @@ export default function ExtendLeaveModal({ leave, balances, onClose, onExtended 
               <span className={`badge badge-${leave.timeOffType?.toLowerCase()}`} style={{ fontWeight: 700 }}>
                 {leave.timeOffType} Leave
               </span>
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Current: <strong>{leave.totalDays} days</strong>
-              </span>
             </div>
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)', display: 'flex', gap: 12 }}>
               <span>📅 Current Span: <strong>{leave.startDate}</strong> → <strong>{leave.endDate}</strong></span>
@@ -138,23 +134,13 @@ export default function ExtendLeaveModal({ leave, balances, onClose, onExtended 
                 borderRadius: 'var(--radius-md)',
                 padding: '12px 14px',
                 marginBottom: '14px',
-                fontSize: 'var(--font-size-xs)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                fontSize: 'var(--font-size-xs)'
               }}>
-                <div>
-                  <div style={{ fontWeight: 700, color: 'var(--wd-blue)' }}>
-                    ➕ Extension: +{additionalDays} {additionalDays === 1 ? 'working day' : 'working days'}
-                  </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-2xs)', marginTop: 2 }}>
-                    New Duration: {leave.startDate} → {newEndDate}
-                  </div>
+                <div style={{ fontWeight: 700, color: 'var(--wd-blue)' }}>
+                  ➕ Extension: +{additionalDays} {additionalDays === 1 ? 'working day' : 'working days'}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                    {newTotalDays} Total Days
-                  </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-2xs)', marginTop: 2 }}>
+                  New Duration: {leave.startDate} → {newEndDate}
                 </div>
               </div>
             )}

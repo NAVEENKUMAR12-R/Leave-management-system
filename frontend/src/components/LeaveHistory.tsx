@@ -325,6 +325,47 @@ export default function LeaveHistory() {
           </div>
         </div>
 
+        {/* Selected Employee Quick Balance Strip */}
+        {selectedEmployeeId !== 'ALL' && (() => {
+          const emp = employees.find(e => e.id.toString() === selectedEmployeeId);
+          if (!emp) return null;
+          return (
+            <div style={{
+              padding: '10px 24px',
+              background: 'var(--wd-blue-light)',
+              borderBottom: '1px solid rgba(0, 85, 179, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 10,
+              fontSize: 'var(--font-size-xs)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontWeight: 700, color: 'var(--wd-blue)' }}>👤 {emp.name}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>({emp.department || 'General'} · {emp.designation || 'Team Member'})</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                  background: 'var(--wd-green-light)', color: 'var(--wd-green)',
+                  fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.2)'
+                }}>
+                  ⚡ PTO Available: {emp.totalPtoAvailable ?? 0} / {emp.totalPtoAllocated ?? 0} days ({emp.totalPtoUsed ?? 0} used)
+                </span>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                  background: (emp.totalUnpaidDays ?? 0) > 0 ? '#fef2f2' : 'var(--bg-subtle)',
+                  color: (emp.totalUnpaidDays ?? 0) > 0 ? '#dc2626' : 'var(--text-secondary)',
+                  fontWeight: 600, border: (emp.totalUnpaidDays ?? 0) > 0 ? '1px solid #fca5a5' : '1px solid var(--border-light)'
+                }}>
+                  ○ Non-Paid (LOP): {emp.totalUnpaidDays ?? 0} days
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Records Table */}
         <div className="card-body-compact">
           {loading ? (
