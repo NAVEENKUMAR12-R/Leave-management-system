@@ -76,6 +76,7 @@ export default function EmployeeDetailModal({ employee, onClose }: Props) {
               </div>
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: 3, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <span>📧 {employee.email}</span>
+                <span>🌐 {employee.region || 'Global'}</span>
                 <span>🏢 {employee.department || 'General'}</span>
                 <span>💼 {employee.designation || 'Team Member'}</span>
                 <span>📅 Hired: {employee.hireDate || '2026-01-01'}</span>

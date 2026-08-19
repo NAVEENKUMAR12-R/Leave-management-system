@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import type { UserSummary, LeavePolicyInfo } from '../types';
 
@@ -26,6 +26,15 @@ const EMPLOYEE_TYPES = [
   { value: 'INTERN', label: 'Intern' },
 ];
 
+const REGIONS = [
+  'North America',
+  'APAC',
+  'EMEA',
+  'India',
+  'Latin America',
+  'Global'
+];
+
 export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,6 +42,7 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
   const [department, setDepartment] = useState('Engineering');
   const [designation, setDesignation] = useState('');
   const [employeeType, setEmployeeType] = useState('FULL_TIME');
+  const [region, setRegion] = useState('North America');
   const [hireDate, setHireDate] = useState(new Date().toISOString().split('T')[0]);
   const [managerId, setManagerId] = useState<string>('');
 
@@ -70,6 +80,47 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
     }
   };
 
+  const calculateProratedDays = (defaultDays: number, accrualRate?: number, frequency?: string, joinDateStr?: string) => {
+    if (!joinDateStr || !defaultDays) return defaultDays || 0;
+    const parts = joinDateStr.split('-').map(Number);
+    const m = parts[1] || 1;
+    if (frequency === 'MONTHLY' && accrualRate && accrualRate > 0) {
+      const remainingMonths = Math.max(1, 12 - m + 1);
+      return Math.min(defaultDays, Math.round(remainingMonths * accrualRate));
+    }
+    const [year, month, day] = parts;
+    const join = new Date(year, month - 1, day);
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31);
+    const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const remainingDays = Math.max(0, Math.round((end.getTime() - join.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    if (remainingDays >= totalDays) return defaultDays;
+    const prorated = defaultDays * (remainingDays / totalDays);
+    return Math.max(1, Math.round(prorated));
+  };
+
+  const getMonth1Accrual = (defaultDays: number, accrualRate?: number, frequency?: string) => {
+    if (frequency === 'MONTHLY' && accrualRate && accrualRate > 0) {
+      return Math.round(accrualRate);
+    }
+    return Math.max(1, Math.round(defaultDays / 12));
+  };
+
+  // Filter policies applicable to selected role, region, and employee type
+  const applicablePolicies = useMemo(() => {
+    return policies.filter(p => {
+      // Region check
+      if (p.region && p.region !== 'ALL' && p.region !== 'Global' && region !== 'Global') {
+        if (p.region.toLowerCase() !== region.toLowerCase()) return false;
+      }
+      // Employee Type check
+      if (p.employeeType && p.employeeType !== 'ALL') {
+        if (p.employeeType.toLowerCase() !== employeeType.toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [policies, region, employeeType]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -94,6 +145,7 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
         department,
         designation: designation.trim() || 'Team Member',
         employeeType,
+        region,
         hireDate
       });
       onSuccess(res.data);
@@ -107,12 +159,12 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 620, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 660, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="modal-header">
           <div>
             <h2 className="modal-title">👤 Onboard New Employee</h2>
             <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-              Provision worker account, assign roles, and auto-initialize leave balances
+              Provision worker account with regional compliance and auto-calculated prorated benefits
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -170,7 +222,9 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
                   onChange={e => setHireDate(e.target.value)}
                   required
                 />
-                <div className="form-hint">Used for automatic join-date leave proration</div>
+                <div className="form-hint" style={{ color: 'var(--wd-orange)', fontWeight: 600 }}>
+                  ⚡ Balances will be strictly prorated from this join date
+                </div>
               </div>
             </div>
 
@@ -219,23 +273,21 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
               </div>
             </div>
 
-            {/* Section 3: Hierarchy & Organization */}
+            {/* Section 3: Hierarchy, Region & Department */}
             <div className="form-row" style={{ marginTop: 8 }}>
               <div className="form-group">
-                <label className="form-label">Reporting Manager</label>
+                <label className="form-label">Work Region / Location *</label>
                 <select
                   className="form-select"
-                  value={managerId}
-                  onChange={e => setManagerId(e.target.value)}
+                  value={region}
+                  onChange={e => setRegion(e.target.value)}
+                  required
                 >
-                  <option value="">None (Direct to HR / Self-Managed)</option>
-                  {managers.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({m.roles.map(r => r.replace('ROLE_', '')).join(', ')})
-                    </option>
+                  {REGIONS.map(r => (
+                    <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
-                <div className="form-hint">Approves Step 1 of employee leave requests</div>
+                <div className="form-hint">Enforces regional holiday calendar & leave policies</div>
               </div>
 
               <div className="form-group">
@@ -254,14 +306,20 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Designation / Job Title</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={designation}
-                  onChange={e => setDesignation(e.target.value)}
-                  placeholder="e.g. Senior Software Engineer"
-                />
+                <label className="form-label">Reporting Manager</label>
+                <select
+                  className="form-select"
+                  value={managerId}
+                  onChange={e => setManagerId(e.target.value)}
+                >
+                  <option value="">None (Direct to HR / Self-Managed)</option>
+                  {managers.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.roles.map(r => r.replace('ROLE_', '')).join(', ')})
+                    </option>
+                  ))}
+                </select>
+                <div className="form-hint">Approves Step 1 of employee leave requests</div>
               </div>
 
               <div className="form-group">
@@ -278,41 +336,74 @@ export default function OnboardEmployeeModal({ onClose, onSuccess }: Props) {
               </div>
             </div>
 
-            {/* Section 4: Auto-Provisioning Preview */}
+            <div className="form-group">
+              <label className="form-label">Designation / Job Title</label>
+              <input
+                type="text"
+                className="form-input"
+                value={designation}
+                onChange={e => setDesignation(e.target.value)}
+                placeholder="e.g. Senior Software Engineer"
+              />
+            </div>
+
+            {/* Section 4: Auto-Calculated Proration Preview */}
             <div style={{
-              background: 'var(--bg-subtle)',
-              border: '1px solid var(--border-light)',
+              background: 'var(--wd-blue-light)',
+              border: '1px solid rgba(0, 85, 179, 0.2)',
               borderRadius: 'var(--radius-lg)',
-              padding: '12px 16px',
+              padding: '14px 16px',
               marginTop: 10,
               marginBottom: 16
             }}>
-              <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--wd-blue)', marginBottom: 4 }}>
-                ⚡ Automatic Leave Balance Provisioning
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--wd-blue)' }}>
+                  ⚡ Auto-Calculated Prorated Leave Benefits ({applicablePolicies.length} Policies)
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--wd-orange)' }}>
+                  Region: {region}
+                </span>
               </div>
-              <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-secondary)' }}>
-                Upon onboarding, this employee will automatically receive prorated balances for {policies.length} active policies:
+              <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-secondary)', marginBottom: 8 }}>
+                Based on join date <strong>{hireDate}</strong>, benefits are calculated proportionally for the remaining days of the annual period:
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                {policies.map(p => (
-                  <span
-                    key={p.id}
-                    style={{
-                      fontSize: '11px', fontWeight: 600, padding: '2px 8px',
-                      borderRadius: 'var(--radius-full)', background: 'white',
-                      border: '1px solid var(--border-default)', color: 'var(--text-primary)'
-                    }}
-                  >
-                    {p.leaveType} ({p.defaultDays}d/yr · {p.isProrated !== false ? 'Prorated' : 'Full'})
-                  </span>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
+                {applicablePolicies.map(p => {
+                  const proratedDays = calculateProratedDays(p.defaultDays, p.accrualRate, p.accrualFrequency, hireDate);
+                  const month1Accrual = getMonth1Accrual(p.defaultDays, p.accrualRate, p.accrualFrequency);
+                  return (
+                    <div
+                      key={p.id}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'white',
+                        border: '1px solid rgba(0, 85, 179, 0.15)',
+                        boxShadow: 'var(--shadow-xs)'
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: '11px', color: 'var(--wd-blue)' }}>
+                        {p.leaveType} Leave
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>
+                        {proratedDays} Days <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-tertiary)' }}>(Total)</span>
+                      </div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--wd-green)', marginTop: 2 }}>
+                        ⚡ {month1Accrual} Day{month1Accrual > 1 ? 's' : ''} Month 1 Accrual
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                        Baseline: {p.defaultDays}d/yr ({p.accrualRate || 1}d/mo)
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             <div className="modal-footer" style={{ padding: 0, borderTop: 'none' }}>
               <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? 'Onboarding Employee...' : '✓ Complete Onboarding'}
+                {loading ? 'Onboarding Employee...' : '✓ Complete Onboarding with Prorated Benefits'}
               </button>
             </div>
           </form>

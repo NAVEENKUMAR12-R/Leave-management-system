@@ -19,6 +19,7 @@ public class UserSummaryDTO {
     private String department;
     private String designation;
     private String employeeType;
+    private String region;
     private LocalDate hireDate;
 
     // Leave & PTO statistics

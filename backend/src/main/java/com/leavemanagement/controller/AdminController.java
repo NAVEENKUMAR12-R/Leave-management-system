@@ -14,11 +14,20 @@ import java.util.List;
 public class AdminController {
 
     private final LeavePolicyRepository leavePolicyRepository;
+    private final com.leavemanagement.repository.UserRepository userRepository;
+    private final com.leavemanagement.repository.LeaveBalanceRepository leaveBalanceRepository;
+    private final com.leavemanagement.service.LeaveService leaveService;
     private final com.leavemanagement.service.SseEmitterService sseEmitterService;
 
     public AdminController(LeavePolicyRepository leavePolicyRepository,
+                           com.leavemanagement.repository.UserRepository userRepository,
+                           com.leavemanagement.repository.LeaveBalanceRepository leaveBalanceRepository,
+                           com.leavemanagement.service.LeaveService leaveService,
                            com.leavemanagement.service.SseEmitterService sseEmitterService) {
         this.leavePolicyRepository = leavePolicyRepository;
+        this.userRepository = userRepository;
+        this.leaveBalanceRepository = leaveBalanceRepository;
+        this.leaveService = leaveService;
         this.sseEmitterService = sseEmitterService;
     }
 
@@ -32,6 +41,7 @@ public class AdminController {
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<LeavePolicy> createOrUpdatePolicy(@RequestBody LeavePolicy policy) {
         LeavePolicy saved = leavePolicyRepository.save(policy);
+        syncPolicyToEligibleUsers(saved);
         sseEmitterService.broadcast("POLICY_UPDATE", saved);
         return ResponseEntity.ok(saved);
     }
@@ -94,8 +104,26 @@ public class AdminController {
         newPolicy.setReportFrequency(oldPolicy.getReportFrequency());
 
         LeavePolicy savedRenewed = leavePolicyRepository.save(newPolicy);
+        syncPolicyToEligibleUsers(savedRenewed);
         sseEmitterService.broadcast("POLICY_UPDATE", savedRenewed);
         return ResponseEntity.ok(savedRenewed);
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasRole('HR_ADMIN')")
+    public ResponseEntity<LeavePolicy> restorePolicy(@PathVariable Long id) {
+        LeavePolicy policy = leavePolicyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Policy not found"));
+
+        policy.setIsActive(true);
+        policy.setPolicyStatus("ACTIVE");
+        if (policy.getEndDate() != null && policy.getEndDate().isBefore(java.time.LocalDate.now())) {
+            policy.setEndDate(java.time.LocalDate.now().plusYears(1));
+        }
+        LeavePolicy restored = leavePolicyRepository.save(policy);
+        syncPolicyToEligibleUsers(restored);
+        sseEmitterService.broadcast("POLICY_UPDATE", restored);
+        return ResponseEntity.ok(restored);
     }
 
     @DeleteMapping("/{id}")
@@ -109,9 +137,9 @@ public class AdminController {
         if (permanent) {
             leavePolicyRepository.delete(policy);
             sseEmitterService.broadcast("POLICY_UPDATE", java.util.Map.of("deletedId", id, "permanent", true));
-            return ResponseEntity.ok().body(java.util.Map.of("message", "Policy permanently removed"));
+            return ResponseEntity.ok().body(java.util.Map.of("message", "Policy permanently removed from database"));
         } else {
-            // Soft delete / Move to Policy History
+            // Soft delete / Move to Policy History & Recycle Bin
             policy.setIsActive(false);
             policy.setPolicyStatus("ARCHIVED");
             if (policy.getEndDate() == null || policy.getEndDate().isAfter(java.time.LocalDate.now())) {
@@ -119,7 +147,35 @@ public class AdminController {
             }
             LeavePolicy archived = leavePolicyRepository.save(policy);
             sseEmitterService.broadcast("POLICY_UPDATE", archived);
-            return ResponseEntity.ok().body(java.util.Map.of("message", "Policy archived to history successfully"));
+            return ResponseEntity.ok().body(java.util.Map.of("message", "Policy moved to Recycle Bin / History successfully"));
+        }
+    }
+
+    private void syncPolicyToEligibleUsers(LeavePolicy policy) {
+        if (policy == null || policy.getIsActive() == Boolean.FALSE || "ARCHIVED".equalsIgnoreCase(policy.getPolicyStatus())) {
+            return;
+        }
+
+        String leaveType = policy.getLeaveType().toUpperCase();
+        for (com.leavemanagement.model.User user : userRepository.findAll()) {
+            if (leaveService.isPolicyApplicableToUser(policy, user)) {
+                double quota = leaveService.calculateProratedQuota(
+                        policy,
+                        user.getHireDate(),
+                        policy.getEffectiveDate(),
+                        policy.getEndDate()
+                );
+
+                com.leavemanagement.model.LeaveBalance balance = leaveBalanceRepository
+                        .findByUserIdAndLeaveType(user.getId(), leaveType)
+                        .orElseGet(() -> new com.leavemanagement.model.LeaveBalance(null, user, leaveType, quota, 0.0));
+
+                balance.setTotalLeaves(quota);
+                if (balance.getUsedLeaves() == null) {
+                    balance.setUsedLeaves(0.0);
+                }
+                leaveBalanceRepository.save(balance);
+            }
         }
     }
 }

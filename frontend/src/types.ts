@@ -114,6 +114,7 @@ export interface UserSummary {
   department?: string;
   designation?: string;
   employeeType?: string;
+  region?: string;
   hireDate?: string;
   totalPtoAllocated?: number;
   totalPtoUsed?: number;
@@ -131,6 +132,7 @@ export interface OnboardEmployeePayload {
   department?: string;
   designation?: string;
   employeeType?: string;
+  region?: string;
   hireDate?: string;
 }
 

@@ -12,6 +12,7 @@ export default function EmployeeDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedRegion, setSelectedRegion] = useState('ALL');
   const [successToast, setSuccessToast] = useState('');
 
   useEffect(() => {
@@ -50,6 +51,14 @@ export default function EmployeeDirectory() {
     return Array.from(depts);
   }, [employees]);
 
+  const regions = useMemo(() => {
+    const regs = new Set<string>();
+    employees.forEach(e => {
+      if (e.region) regs.add(e.region);
+    });
+    return Array.from(regs);
+  }, [employees]);
+
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       if (searchTerm) {
@@ -58,7 +67,8 @@ export default function EmployeeDirectory() {
         const matchEmail = e.email?.toLowerCase().includes(q);
         const matchDesignation = e.designation?.toLowerCase().includes(q);
         const matchDept = e.department?.toLowerCase().includes(q);
-        if (!matchName && !matchEmail && !matchDesignation && !matchDept) return false;
+        const matchRegion = e.region?.toLowerCase().includes(q);
+        if (!matchName && !matchEmail && !matchDesignation && !matchDept && !matchRegion) return false;
       }
       if (selectedRole !== 'ALL') {
         const hasRole = e.roles?.some(r => r.toUpperCase().includes(selectedRole.toUpperCase()));
@@ -67,24 +77,12 @@ export default function EmployeeDirectory() {
       if (selectedDept !== 'ALL') {
         if (e.department !== selectedDept) return false;
       }
+      if (selectedRegion !== 'ALL') {
+        if ((e.region || 'Global').toLowerCase() !== selectedRegion.toLowerCase()) return false;
+      }
       return true;
     });
-  }, [employees, searchTerm, selectedRole, selectedDept]);
-
-  // Summary Metrics across all filtered workers
-  const summaryStats = useMemo(() => {
-    const totalWorkers = filteredEmployees.length;
-    const totalPtoAvailable = filteredEmployees.reduce((acc, curr) => acc + (curr.totalPtoAvailable ?? 0), 0);
-    const totalPtoUsed = filteredEmployees.reduce((acc, curr) => acc + (curr.totalPtoUsed ?? 0), 0);
-    const totalUnpaidDays = filteredEmployees.reduce((acc, curr) => acc + (curr.totalUnpaidDays ?? 0), 0);
-
-    return {
-      totalWorkers,
-      totalPtoAvailable: Math.round(totalPtoAvailable * 10) / 10,
-      totalPtoUsed: Math.round(totalPtoUsed * 10) / 10,
-      totalUnpaidDays: Math.round(totalUnpaidDays * 10) / 10,
-    };
-  }, [filteredEmployees]);
+  }, [employees, searchTerm, selectedRole, selectedDept, selectedRegion]);
 
   const handleOnboardSuccess = (newEmp: UserSummary) => {
     setShowOnboardModal(false);
@@ -117,26 +115,6 @@ export default function EmployeeDirectory() {
           <div>{successToast}</div>
         </div>
       )}
-
-      {/* Overview Stat Cards */}
-      <div className="stats-grid animate-in" style={{ marginBottom: 20 }}>
-        <div className="stat-card blue">
-          <div className="stat-label">Total Workforce</div>
-          <div className="stat-value">{summaryStats.totalWorkers} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>workers</span></div>
-        </div>
-        <div className="stat-card green">
-          <div className="stat-label">Total Available PTO</div>
-          <div className="stat-value">{summaryStats.totalPtoAvailable} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>days</span></div>
-        </div>
-        <div className="stat-card" style={{ borderLeft: '4px solid var(--wd-orange)' }}>
-          <div className="stat-label">Total PTO Days Used</div>
-          <div className="stat-value">{summaryStats.totalPtoUsed} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>days</span></div>
-        </div>
-        <div className="stat-card red">
-          <div className="stat-label">Total Non-Paid Off (LOP)</div>
-          <div className="stat-value">{summaryStats.totalUnpaidDays} <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500 }}>days</span></div>
-        </div>
-      </div>
 
       {/* Header & Main Table Card */}
       <div className="card animate-in animate-in-1">
@@ -211,7 +189,21 @@ export default function EmployeeDirectory() {
             </select>
           </div>
 
-          <div style={{ minWidth: 160 }}>
+          <div style={{ minWidth: 150 }}>
+            <select
+              className="form-select"
+              value={selectedRegion}
+              onChange={e => setSelectedRegion(e.target.value)}
+              style={{ fontSize: 'var(--font-size-xs)' }}
+            >
+              <option value="ALL">All Regions</option>
+              {regions.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ minWidth: 150 }}>
             <select
               className="form-select"
               value={selectedDept}
@@ -370,10 +362,21 @@ export default function EmployeeDirectory() {
                         )}
                       </td>
 
-                      {/* Employment Type & Hire Date */}
+                      {/* Employment Type, Region & Hire Date */}
                       <td>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          {emp.employeeType?.replace('_', ' ') || 'FULL TIME'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {emp.employeeType?.replace('_', ' ') || 'FULL TIME'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, padding: '1px 6px',
+                            borderRadius: 'var(--radius-xs)', background: 'var(--wd-blue-50)',
+                            color: 'var(--wd-blue)', border: '1px solid rgba(8, 117, 225, 0.2)'
+                          }}>
+                            🌐 {emp.region || 'Global'}
+                          </span>
                         </div>
                         <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)' }}>
                           Hired: {emp.hireDate || '2026-01-01'}

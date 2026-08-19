@@ -46,4 +46,6 @@ public class LeaveRequest {
     private Boolean isCompanySponsored; // true if paid/company sponsored, false if unpaid leave of absence
 
     private String payStatus; // COMPANY_SPONSORED, UNPAID_LEAVE_OF_ABSENCE
+    
+    private Double deductedDays = 0.0; // Tracks quota already deducted from balance to prevent double reduction on extension
 }

@@ -18,5 +18,6 @@ public class OnboardEmployeeDTO {
     private String department;
     private String designation;
     private String employeeType; // "FULL_TIME", "PART_TIME", "CONTRACTOR", "INTERN"
+    private String region; // "North America", "APAC", "EMEA", "India", "Global"
     private LocalDate hireDate;
 }

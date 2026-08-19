@@ -100,6 +100,7 @@ public class AdminEmployeeController {
         user.setDepartment(dto.getDepartment() != null ? dto.getDepartment().trim() : "General");
         user.setDesignation(dto.getDesignation() != null ? dto.getDesignation().trim() : "Team Member");
         user.setEmployeeType(dto.getEmployeeType() != null ? dto.getEmployeeType().trim() : "FULL_TIME");
+        user.setRegion(dto.getRegion() != null && !dto.getRegion().trim().isEmpty() ? dto.getRegion().trim() : "Global");
         user.setHireDate(dto.getHireDate() != null ? dto.getHireDate() : LocalDate.now());
 
         // Assign Manager
@@ -130,32 +131,29 @@ public class AdminEmployeeController {
         User savedUser = userRepository.save(user);
 
         // Auto-provision leave balances based on active applicable policies and join-date proration
-        Set<String> assignedRoleNames = savedUser.getRoles().stream()
-                .map(r -> r.getRole().name())
-                .collect(Collectors.toSet());
-
         List<LeavePolicy> activePolicies = leavePolicyRepository.findAll().stream()
                 .filter(p -> p.getIsActive() == null || (p.getIsActive() && !"ARCHIVED".equalsIgnoreCase(p.getPolicyStatus())))
+                .filter(p -> leaveService.isPolicyApplicableToUser(p, savedUser))
                 .collect(Collectors.toList());
 
         for (LeavePolicy policy : activePolicies) {
-            double quota = policy.getDefaultDays() != null ? policy.getDefaultDays() : 10.0;
+            // Strictly calculate join-date prorated benefits for onboarded employees
+            double quota = leaveService.calculateProratedQuota(
+                    policy,
+                    savedUser.getHireDate(),
+                    policy.getEffectiveDate(),
+                    policy.getEndDate()
+            );
 
-            // Apply join date proration if policy is prorated
-            if (Boolean.TRUE.equals(policy.getIsProrated()) && savedUser.getHireDate() != null) {
-                quota = leaveService.calculateProratedQuota(
-                        policy,
-                        savedUser.getHireDate(),
-                        policy.getEffectiveDate(),
-                        policy.getEndDate()
-                );
-            }
+            String leaveType = policy.getLeaveType().toUpperCase();
+            LeaveBalance balance = leaveBalanceRepository
+                    .findByUserIdAndLeaveType(savedUser.getId(), leaveType)
+                    .orElseGet(() -> new LeaveBalance(null, savedUser, leaveType, quota, 0.0));
 
-            LeaveBalance balance = new LeaveBalance();
-            balance.setUser(savedUser);
-            balance.setLeaveType(policy.getLeaveType().toUpperCase());
             balance.setTotalLeaves(quota);
-            balance.setUsedLeaves(0.0);
+            if (balance.getUsedLeaves() == null) {
+                balance.setUsedLeaves(0.0);
+            }
             leaveBalanceRepository.save(balance);
         }
 

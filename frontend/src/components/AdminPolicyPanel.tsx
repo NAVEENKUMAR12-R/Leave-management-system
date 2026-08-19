@@ -68,14 +68,25 @@ export default function AdminPolicyPanel() {
 
   const handleDelete = async (id: number, permanent: boolean = false) => {
     const msg = permanent
-      ? 'Are you sure you want to permanently remove this policy record from database?'
-      : 'Are you sure you want to archive this policy to history?';
+      ? '⚠️ Are you sure you want to permanently delete this policy from the database? This action CANNOT be undone.'
+      : '📦 Move this policy to the Recycle Bin / Policy History? It will no longer apply to employees, but can be restored or re-modified later.';
     if (!confirm(msg)) return;
     try {
       await api.delete(`/admin/policies/${id}?permanent=${permanent}`);
       fetchPolicies();
     } catch (err) {
       alert('Failed to update policy status.');
+    }
+  };
+
+  const handleRestore = async (id: number) => {
+    if (!confirm('🔄 Restore this policy back to Active status? Eligible employees will have their balances re-synced.')) return;
+    try {
+      await api.post(`/admin/policies/${id}/restore`);
+      fetchPolicies();
+      setViewTab('active');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to restore policy.');
     }
   };
 
@@ -117,14 +128,14 @@ export default function AdminPolicyPanel() {
       tenureMonths: 0,
       department: 'All Departments',
       gradeLevel: 'All Grades',
-      accrualRate: 1.67,
+      accrualRate: 2,
       accrualFrequency: 'MONTHLY',
-      defaultDays: 20,
+      defaultDays: 24,
       allowNegativeBalance: false,
       maxNegativeLimit: 0,
       isProrated: true,
       prorationBasis: 'HIRE_DATE',
-      prorationRounding: 'ROUND_HALF',
+      prorationRounding: 'ROUND_UP',
       isCarryForwardAllowed: true,
       maxCarryForwardDays: 5,
       expirationMonths: 6,
@@ -154,13 +165,13 @@ export default function AdminPolicyPanel() {
       tenureMonths: p.tenureMonths || 0,
       department: p.department || 'All Departments',
       gradeLevel: p.gradeLevel || 'All Grades',
-      accrualRate: p.accrualRate || 1.67,
+      accrualRate: p.accrualRate ? Math.round(p.accrualRate) : 2,
       accrualFrequency: p.accrualFrequency || 'MONTHLY',
       allowNegativeBalance: p.allowNegativeBalance || false,
       maxNegativeLimit: p.maxNegativeLimit || 0,
       isProrated: p.isProrated ?? true,
       prorationBasis: p.prorationBasis || 'HIRE_DATE',
-      prorationRounding: p.prorationRounding || 'ROUND_HALF',
+      prorationRounding: p.prorationRounding || 'ROUND_UP',
       expirationMonths: p.expirationMonths || 0,
       approvalStep1: p.approvalStep1 || 'MANAGER',
       approvalStep2: p.approvalStep2 || 'HR',
@@ -248,7 +259,7 @@ export default function AdminPolicyPanel() {
           </div>
         </div>
 
-        {/* View Tabs: Active Policies vs History */}
+        {/* View Tabs: Active Policies vs History / Recycle Bin */}
         <div style={{
           display: 'flex',
           gap: '8px',
@@ -266,33 +277,33 @@ export default function AdminPolicyPanel() {
             className={`btn ${viewTab === 'history' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
             onClick={() => setViewTab('history')}
           >
-            📜 Policy History & Past Periods ({historyPolicies.length})
+            🗑️ Recycle Bin & Policy History ({historyPolicies.length})
           </button>
         </div>
 
         <div className="card-body">
           {displayedPolicies.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-state-icon">{viewTab === 'active' ? '⚙️' : '📜'}</div>
+              <div className="empty-state-icon">{viewTab === 'active' ? '⚙️' : '🗑️'}</div>
               <div className="empty-state-text">
                 {viewTab === 'active'
                   ? 'No active policies configured yet. Click "Create Policy" to build one.'
-                  : 'No historical or archived policy periods found yet.'}
+                  : 'Recycle Bin is empty. No archived or deleted policies.'}
               </div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '16px' }}>
               {displayedPolicies.map(p => (
                 <div key={p.id} style={{
-                  border: '1px solid var(--border-default)',
+                  border: p.isActive === false ? '1.5px dashed var(--border-default)' : '1px solid var(--border-default)',
                   borderRadius: 'var(--radius-lg)',
                   padding: '20px',
-                  background: 'white',
+                  background: p.isActive === false ? 'var(--bg-subtle)' : 'white',
                   boxShadow: 'var(--shadow-sm)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  opacity: p.isActive === false ? 0.85 : 1
+                  opacity: p.isActive === false ? 0.92 : 1
                 }}>
                   <div>
                     {/* Policy Header */}
@@ -313,12 +324,13 @@ export default function AdminPolicyPanel() {
                             <span style={{
                               fontSize: '10px',
                               fontWeight: 700,
-                              padding: '2px 6px',
+                              padding: '2px 8px',
                               borderRadius: 'var(--radius-full)',
-                              background: 'var(--bg-hover)',
-                              color: 'var(--text-tertiary)'
+                              background: '#fef2f2',
+                              color: '#b91c1c',
+                              border: '1px solid #fca5a5'
                             }}>
-                              ARCHIVED / PAST
+                              🗑️ IN RECYCLE BIN
                             </span>
                           )}
                         </div>
@@ -370,7 +382,7 @@ export default function AdminPolicyPanel() {
                       </div>
                       <div>
                         <strong style={{ color: 'var(--text-secondary)' }}>Accrual:</strong><br />
-                        <span>{p.accrualRate || 1.67} d/{p.accrualFrequency?.toLowerCase() || 'mo'}</span>
+                        <span>{p.accrualRate || 2} d/{p.accrualFrequency?.toLowerCase() || 'mo'}</span>
                       </div>
                       <div>
                         <strong style={{ color: 'var(--text-secondary)' }}>Carryover:</strong><br />
@@ -394,48 +406,57 @@ export default function AdminPolicyPanel() {
                     alignItems: 'center',
                     gap: '8px',
                     borderTop: '1px solid var(--border-light)',
-                    paddingTop: '12px'
+                    paddingTop: '12px',
+                    flexWrap: 'wrap'
                   }}>
-                    {/* Restart / Renew button: ONLY FOR POLICIES IN HISTORY */}
                     {p.isActive === false ? (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        style={{ background: 'var(--wd-green)', borderColor: 'var(--wd-green)' }}
-                        onClick={() => {
-                          setRestartPolicyTarget(p);
-                          setRestartStartDate(new Date().toISOString().split('T')[0]);
-                          const d = new Date();
-                          d.setFullYear(d.getFullYear() + 1);
-                          setRestartEndDate(d.toISOString().split('T')[0]);
-                        }}
-                        title="Restart or renew this policy for a new time period"
-                      >
-                        🔄 Restart from New Date
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ background: 'var(--wd-green)', borderColor: 'var(--wd-green)' }}
+                          onClick={() => p.id && handleRestore(p.id)}
+                          title="Restore this policy back to active status"
+                        >
+                          🔄 Restore Policy
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setRestartPolicyTarget(p);
+                            setRestartStartDate(new Date().toISOString().split('T')[0]);
+                            const d = new Date();
+                            d.setFullYear(d.getFullYear() + 1);
+                            setRestartEndDate(d.toISOString().split('T')[0]);
+                          }}
+                          title="Restart or renew this policy for a new time period"
+                        >
+                          🚀 Restart from New Date
+                        </button>
+                      </div>
                     ) : (
                       <div />
                     )}
 
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)}>
-                        ✏️ Edit
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(p)} title="Edit policy parameters and configuration">
+                        ✏️ Edit / Modify
                       </button>
                       {p.id && (
                         p.isActive !== false ? (
                           <button
                             className="btn btn-danger btn-sm"
                             onClick={() => handleDelete(p.id!, false)}
-                            title="Archive this policy to history"
+                            title="Move this policy to the Recycle Bin / History"
                           >
-                            📦 Archive to History
+                            📦 Move to Bin
                           </button>
                         ) : (
                           <button
                             className="btn btn-danger btn-sm"
                             onClick={() => handleDelete(p.id!, true)}
-                            title="Permanently remove from database"
+                            title="Permanently remove from database forever"
                           >
-                            🗑️ Delete
+                            🗑️ Delete Permanently
                           </button>
                         )
                       )}

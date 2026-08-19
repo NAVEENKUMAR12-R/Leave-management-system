@@ -8,7 +8,9 @@ import lombok.AllArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
-@Table(name = "leave_balances")
+@Table(name = "leave_balances", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "leaveType"})
+})
 @Getter
 @Setter
 @NoArgsConstructor

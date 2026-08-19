@@ -33,6 +33,7 @@ public class User {
     private String department;
     private String designation;
     private String employeeType;
+    private String region;
     private java.time.LocalDate hireDate;
 
     @ManyToOne(fetch = FetchType.LAZY)

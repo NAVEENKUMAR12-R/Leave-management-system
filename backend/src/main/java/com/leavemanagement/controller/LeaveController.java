@@ -10,6 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import com.leavemanagement.model.User;
+import com.leavemanagement.repository.UserRepository;
+
 import java.util.List;
 import java.util.Map;
 
@@ -21,13 +24,16 @@ public class LeaveController {
     private final LeaveService leaveService;
     private final LeaveBalanceRepository leaveBalanceRepository;
     private final com.leavemanagement.repository.LeavePolicyRepository leavePolicyRepository;
+    private final UserRepository userRepository;
 
     public LeaveController(LeaveService leaveService,
             LeaveBalanceRepository leaveBalanceRepository,
-            com.leavemanagement.repository.LeavePolicyRepository leavePolicyRepository) {
+            com.leavemanagement.repository.LeavePolicyRepository leavePolicyRepository,
+            UserRepository userRepository) {
         this.leaveService = leaveService;
         this.leaveBalanceRepository = leaveBalanceRepository;
         this.leavePolicyRepository = leavePolicyRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/apply")
@@ -44,52 +50,45 @@ public class LeaveController {
     @GetMapping("/my-balances")
     public ResponseEntity<List<com.leavemanagement.payload.LeaveBalanceDTO>> getMyBalances(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        int currentMonth = java.time.LocalDate.now().getMonthValue(); // 1 = Jan, 2 = Feb, ... 12 = Dec
+        int currentMonth = java.time.LocalDate.now().getMonthValue();
 
-        java.util.Set<String> userRoles = userDetails.getAuthorities().stream()
-                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
-                .collect(java.util.stream.Collectors.toSet());
+        User currentUser = userRepository.findById(userDetails.getId()).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
 
-        // Get all active and role-applicable policies for the user
-        List<com.leavemanagement.model.LeavePolicy> activePolicies = leavePolicyRepository.findAll().stream()
-                .filter(p -> p.getIsActive() == null
-                        || (p.getIsActive() && !"ARCHIVED".equalsIgnoreCase(p.getPolicyStatus())))
-                .filter(p -> isPolicyApplicableToRoles(p.getEligibleRole(), userRoles))
-                .collect(java.util.stream.Collectors.toList());
-
-        java.util.Map<String, com.leavemanagement.model.LeavePolicy> policyMap = activePolicies.stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        p -> p.getLeaveType().toUpperCase(),
-                        p -> p,
-                        (existing, replacement) -> replacement
-                ));
+        int joinMonth = (currentUser.getHireDate() != null && currentUser.getHireDate().getYear() == java.time.LocalDate.now().getYear())
+                ? currentUser.getHireDate().getMonthValue()
+                : 1;
+        int elapsedMonths = Math.max(1, currentMonth - joinMonth + 1);
 
         List<com.leavemanagement.payload.LeaveBalanceDTO> dtos = leaveBalanceRepository
                 .findByUserId(userDetails.getId())
                 .stream()
-                // ONLY return balances for active, non-archived policies applicable to this user
-                .filter(b -> policyMap.containsKey(b.getLeaveType().toUpperCase()))
                 .map(b -> {
-                    com.leavemanagement.model.LeavePolicy policy = policyMap.get(b.getLeaveType().toUpperCase());
+                    // Use the best matching policy for THIS user (not just any policy of this type)
+                    com.leavemanagement.model.LeavePolicy policy = leaveService.findBestMatchingPolicy(b.getLeaveType(), currentUser);
 
-                    String frequency = policy != null && policy.getAccrualFrequency() != null
-                            ? policy.getAccrualFrequency()
-                            : ("CASUAL".equalsIgnoreCase(b.getLeaveType()) ? "ANNUAL" : "MONTHLY");
+                    // Skip balances where no active policy matches this user
+                    if (policy == null) return null;
 
-                    Double rate = policy != null && policy.getAccrualRate() != null
-                            ? policy.getAccrualRate()
-                            : (b.getTotalLeaves() != null ? Math.round((b.getTotalLeaves() / 12.0) * 100.0) / 100.0 : 1.0);
+                    // Derive all values from the resolved policy (no hardcoded fallbacks)
+                    String frequency = policy.getAccrualFrequency() != null
+                            ? policy.getAccrualFrequency() : "MONTHLY";
 
-                    // Sync totalLeaves with current active policy's default days
-                    double totalAnnual = policy != null && policy.getDefaultDays() != null
-                            ? policy.getDefaultDays()
-                            : (b.getTotalLeaves() != null ? b.getTotalLeaves() : 0.0);
+                    double totalAnnual = b.getTotalLeaves() != null
+                            ? b.getTotalLeaves()
+                            : (policy.getDefaultDays() != null ? policy.getDefaultDays() : 0.0);
+
+                    Double rate = policy.getAccrualRate() != null
+                            ? Math.round(policy.getAccrualRate() * 100.0) / 100.0
+                            : (totalAnnual > 0 ? Math.max(1.0, Math.round(totalAnnual / 12.0)) : 1.0);
 
                     double used = b.getUsedLeaves() != null ? b.getUsedLeaves() : 0.0;
                     double accrued;
 
                     if ("MONTHLY".equalsIgnoreCase(frequency)) {
-                        accrued = Math.min(totalAnnual, Math.round(currentMonth * rate * 100.0) / 100.0);
+                        accrued = Math.min(totalAnnual, Math.round(elapsedMonths * rate * 100.0) / 100.0);
                     } else {
                         accrued = totalAnnual;
                     }
@@ -107,6 +106,7 @@ public class LeaveController {
                             frequency
                     );
                 })
+                .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
@@ -114,46 +114,17 @@ public class LeaveController {
     @GetMapping("/my-policies")
     public ResponseEntity<List<com.leavemanagement.model.LeavePolicy>> getMyPolicies(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        java.util.Set<String> userRoles = userDetails.getAuthorities().stream()
-                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
-                .collect(java.util.stream.Collectors.toSet());
+        User currentUser = userRepository.findById(userDetails.getId()).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
 
         List<com.leavemanagement.model.LeavePolicy> activePolicies = leavePolicyRepository.findAll().stream()
                 .filter(p -> p.getIsActive() == null
                         || (p.getIsActive() && !"ARCHIVED".equalsIgnoreCase(p.getPolicyStatus())))
-                .filter(p -> isPolicyApplicableToRoles(p.getEligibleRole(), userRoles))
+                .filter(p -> leaveService.isPolicyApplicableToUser(p, currentUser))
                 .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(activePolicies);
-    }
-
-    private String getPrimaryUserRole(java.util.Set<String> userRoles) {
-        if (userRoles.contains("ROLE_HR_ADMIN")) return "HR_ADMIN";
-        if (userRoles.contains("ROLE_HR")) return "HR";
-        if (userRoles.contains("ROLE_MANAGER")) return "MANAGER";
-        return "EMPLOYEE";
-    }
-
-    private boolean isPolicyApplicableToRoles(String eligibleRole, java.util.Set<String> userRoles) {
-        if (eligibleRole == null || eligibleRole.trim().isEmpty() || "ALL".equalsIgnoreCase(eligibleRole.trim())) {
-            return true;
-        }
-        String primaryRole = getPrimaryUserRole(userRoles);
-        String target = eligibleRole.trim().toUpperCase();
-        switch (target) {
-            case "EMPLOYEE":
-                return "EMPLOYEE".equals(primaryRole);
-            case "MANAGER":
-                return "MANAGER".equals(primaryRole);
-            case "HR":
-                return "HR".equals(primaryRole);
-            case "HR_ADMIN":
-            case "ADMIN":
-                return "HR_ADMIN".equals(primaryRole);
-            case "EMPLOYEE_MANAGER":
-                return "EMPLOYEE".equals(primaryRole) || "MANAGER".equals(primaryRole);
-            default:
-                return target.equalsIgnoreCase(primaryRole);
-        }
     }
 
     @GetMapping("/manager/to-approve")
