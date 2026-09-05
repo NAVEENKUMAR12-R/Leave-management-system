@@ -4,6 +4,7 @@ import com.leavemanagement.model.LeavePolicy;
 import com.leavemanagement.repository.LeavePolicyRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,10 +21,10 @@ public class AdminController {
     private final com.leavemanagement.service.SseEmitterService sseEmitterService;
 
     public AdminController(LeavePolicyRepository leavePolicyRepository,
-                           com.leavemanagement.repository.UserRepository userRepository,
-                           com.leavemanagement.repository.LeaveBalanceRepository leaveBalanceRepository,
-                           com.leavemanagement.service.LeaveService leaveService,
-                           com.leavemanagement.service.SseEmitterService sseEmitterService) {
+            com.leavemanagement.repository.UserRepository userRepository,
+            com.leavemanagement.repository.LeaveBalanceRepository leaveBalanceRepository,
+            com.leavemanagement.service.LeaveService leaveService,
+            com.leavemanagement.service.SseEmitterService sseEmitterService) {
         this.leavePolicyRepository = leavePolicyRepository;
         this.userRepository = userRepository;
         this.leaveBalanceRepository = leaveBalanceRepository;
@@ -147,12 +148,15 @@ public class AdminController {
             }
             LeavePolicy archived = leavePolicyRepository.save(policy);
             sseEmitterService.broadcast("POLICY_UPDATE", archived);
-            return ResponseEntity.ok().body(java.util.Map.of("message", "Policy moved to Recycle Bin / History successfully"));
+            return ResponseEntity.ok()
+                    .body(java.util.Map.of("message", "Policy moved to Recycle Bin / History successfully"));
         }
     }
 
+    @Transactional
     private void syncPolicyToEligibleUsers(LeavePolicy policy) {
-        if (policy == null || policy.getIsActive() == Boolean.FALSE || "ARCHIVED".equalsIgnoreCase(policy.getPolicyStatus())) {
+        if (policy == null || policy.getIsActive() == Boolean.FALSE
+                || "ARCHIVED".equalsIgnoreCase(policy.getPolicyStatus())) {
             return;
         }
 
@@ -163,8 +167,7 @@ public class AdminController {
                         policy,
                         user.getHireDate(),
                         policy.getEffectiveDate(),
-                        policy.getEndDate()
-                );
+                        policy.getEndDate());
 
                 com.leavemanagement.model.LeaveBalance balance = leaveBalanceRepository
                         .findByUserIdAndLeaveType(user.getId(), leaveType)

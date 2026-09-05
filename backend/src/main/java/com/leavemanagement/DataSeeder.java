@@ -96,19 +96,19 @@ public class DataSeeder implements CommandLineRunner {
             u.setEmployeeType("FULL_TIME");
             u.setRegion("APAC");
             u.setHireDate(LocalDate.of(2024, 6, 1));
-            u.setManager(sarah);
             u.getRoles().add(new UserRole(null, u, RoleName.EMPLOYEE));
             u.getRoles().add(new UserRole(null, u, RoleName.MANAGER));
             return userRepository.save(u);
         });
-        if (john.getRegion() == null) {
-            john.setRegion("APAC");
-            john.setDepartment("Engineering");
-            john.setDesignation("Engineering Manager");
-            john.setEmployeeType("FULL_TIME");
-            john.setHireDate(LocalDate.of(2024, 6, 1));
-            userRepository.save(john);
-        }
+        // Backfill profile fields and manager link regardless of whether just created or pre-existing
+        boolean johnChanged = false;
+        if (john.getRegion() == null) { john.setRegion("APAC"); johnChanged = true; }
+        if (john.getDepartment() == null) { john.setDepartment("Engineering"); johnChanged = true; }
+        if (john.getDesignation() == null) { john.setDesignation("Engineering Manager"); johnChanged = true; }
+        if (john.getEmployeeType() == null) { john.setEmployeeType("FULL_TIME"); johnChanged = true; }
+        if (john.getHireDate() == null) { john.setHireDate(LocalDate.of(2024, 6, 1)); johnChanged = true; }
+        if (john.getManager() == null) { john.setManager(sarah); johnChanged = true; }
+        if (johnChanged) userRepository.save(john);
 
         // 4. Create or get Alice and Bob (Employees, report to John)
         User alice = userRepository.findByEmail("alice@example.com").orElseGet(() -> {
@@ -121,18 +121,18 @@ public class DataSeeder implements CommandLineRunner {
             u.setEmployeeType("FULL_TIME");
             u.setRegion("APAC");
             u.setHireDate(LocalDate.of(2025, 1, 10));
-            u.setManager(john);
             u.getRoles().add(new UserRole(null, u, RoleName.EMPLOYEE));
             return userRepository.save(u);
         });
-        if (alice.getRegion() == null) {
-            alice.setRegion("APAC");
-            alice.setDepartment("Engineering");
-            alice.setDesignation("Senior Software Engineer");
-            alice.setEmployeeType("FULL_TIME");
-            alice.setHireDate(LocalDate.of(2025, 1, 10));
-            userRepository.save(alice);
-        }
+        // Backfill manager link and profile fields regardless of whether just created or pre-existing
+        boolean aliceChanged = false;
+        if (alice.getRegion() == null) { alice.setRegion("APAC"); aliceChanged = true; }
+        if (alice.getDepartment() == null) { alice.setDepartment("Engineering"); aliceChanged = true; }
+        if (alice.getDesignation() == null) { alice.setDesignation("Senior Software Engineer"); aliceChanged = true; }
+        if (alice.getEmployeeType() == null) { alice.setEmployeeType("FULL_TIME"); aliceChanged = true; }
+        if (alice.getHireDate() == null) { alice.setHireDate(LocalDate.of(2025, 1, 10)); aliceChanged = true; }
+        if (alice.getManager() == null) { alice.setManager(john); aliceChanged = true; }
+        if (aliceChanged) userRepository.save(alice);
 
         User bob = userRepository.findByEmail("bob@example.com").orElseGet(() -> {
             User u = new User();
@@ -144,18 +144,18 @@ public class DataSeeder implements CommandLineRunner {
             u.setEmployeeType("FULL_TIME");
             u.setRegion("EMEA");
             u.setHireDate(LocalDate.of(2025, 5, 20));
-            u.setManager(john);
             u.getRoles().add(new UserRole(null, u, RoleName.EMPLOYEE));
             return userRepository.save(u);
         });
-        if (bob.getRegion() == null) {
-            bob.setRegion("EMEA");
-            bob.setDepartment("Engineering");
-            bob.setDesignation("QA Engineer");
-            bob.setEmployeeType("FULL_TIME");
-            bob.setHireDate(LocalDate.of(2025, 5, 20));
-            userRepository.save(bob);
-        }
+        // Backfill manager link and profile fields regardless of whether just created or pre-existing
+        boolean bobChanged = false;
+        if (bob.getRegion() == null) { bob.setRegion("EMEA"); bobChanged = true; }
+        if (bob.getDepartment() == null) { bob.setDepartment("Engineering"); bobChanged = true; }
+        if (bob.getDesignation() == null) { bob.setDesignation("QA Engineer"); bobChanged = true; }
+        if (bob.getEmployeeType() == null) { bob.setEmployeeType("FULL_TIME"); bobChanged = true; }
+        if (bob.getHireDate() == null) { bob.setHireDate(LocalDate.of(2025, 5, 20)); bobChanged = true; }
+        if (bob.getManager() == null) { bob.setManager(john); bobChanged = true; }
+        if (bobChanged) userRepository.save(bob);
 
         // Backfill region for any user in database that doesn't have one
         for (User u : userRepository.findAll()) {

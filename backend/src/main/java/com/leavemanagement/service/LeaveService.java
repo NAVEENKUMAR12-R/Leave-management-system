@@ -284,8 +284,9 @@ public class LeaveService {
         String step2 = policy != null && policy.getApprovalStep2() != null ? policy.getApprovalStep2() : "HR";
         String step3 = policy != null && policy.getApprovalStep3() != null ? policy.getApprovalStep3() : "SKIP";
 
-        boolean isApplicantHR = applicant.getRoles().stream()
-                .anyMatch(r -> r.getRole() == RoleName.HR && r.getRole() != RoleName.HR_ADMIN);
+        // isApplicantHR: has HR role but is NOT an HR_ADMIN (checked across entire role set)
+        boolean isApplicantHR = applicant.getRoles().stream().anyMatch(r -> r.getRole() == RoleName.HR)
+                && applicant.getRoles().stream().noneMatch(r -> r.getRole() == RoleName.HR_ADMIN);
         boolean isApplicantAdmin = applicant.getRoles().stream()
                 .anyMatch(r -> r.getRole() == RoleName.HR_ADMIN);
 
@@ -356,8 +357,9 @@ public class LeaveService {
         String step2 = policy != null && policy.getApprovalStep2() != null ? policy.getApprovalStep2().toUpperCase() : "HR";
         String step3 = policy != null && policy.getApprovalStep3() != null ? policy.getApprovalStep3().toUpperCase() : "SKIP";
 
-        boolean isApplicantHR = applicant.getRoles().stream()
-                .anyMatch(r -> r.getRole() == RoleName.HR && r.getRole() != RoleName.HR_ADMIN);
+        // isApplicantHR: has HR role but is NOT an HR_ADMIN (checked across entire role set)
+        boolean isApplicantHR = applicant.getRoles().stream().anyMatch(r -> r.getRole() == RoleName.HR)
+                && applicant.getRoles().stream().noneMatch(r -> r.getRole() == RoleName.HR_ADMIN);
 
         if ("PENDING_MANAGER".equals(currentStatus)) {
             // Manager approved — move to step 2
@@ -1049,10 +1051,11 @@ public class LeaveService {
         if (eligibleRole == null || eligibleRole.trim().isEmpty() || "ALL".equalsIgnoreCase(eligibleRole.trim())) {
             return true;
         }
+        // userRoles is built from r.getRole().name() (no "ROLE_" prefix), so check plain names only
         String primaryRole = "EMPLOYEE";
-        if (userRoles.contains("ROLE_HR_ADMIN") || userRoles.contains("HR_ADMIN")) primaryRole = "HR_ADMIN";
-        else if (userRoles.contains("ROLE_HR") || userRoles.contains("HR")) primaryRole = "HR";
-        else if (userRoles.contains("ROLE_MANAGER") || userRoles.contains("MANAGER")) primaryRole = "MANAGER";
+        if (userRoles.contains("HR_ADMIN")) primaryRole = "HR_ADMIN";
+        else if (userRoles.contains("HR")) primaryRole = "HR";
+        else if (userRoles.contains("MANAGER")) primaryRole = "MANAGER";
 
         String target = eligibleRole.trim().toUpperCase();
         switch (target) {

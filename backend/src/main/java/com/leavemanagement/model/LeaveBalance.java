@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "leave_balances", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "leaveType"})
+    @UniqueConstraint(columnNames = {"user_id", "leave_type"})
 })
 @Getter
 @Setter
@@ -25,9 +25,12 @@ public class LeaveBalance {
     @JsonIgnore
     private User user;
 
+    @Column(name = "leave_type", nullable = false)
     private String leaveType; // SICK, CASUAL, ANNUAL
 
+    @Column(nullable = false)
     private Double totalLeaves;
-    
+
+    @Column(nullable = false)
     private Double usedLeaves;
 }
