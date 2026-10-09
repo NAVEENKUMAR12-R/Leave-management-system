@@ -1,6 +1,20 @@
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Copy, Check, Shield, Briefcase, User } from 'lucide-react';
+
+interface DemoUser {
+  role: string;
+  name: string;
+  email: string;
+  icon: typeof Shield;
+}
+
+const DEMO_USERS: DemoUser[] = [
+  { role: 'HR Admin', name: 'Admin HR', email: 'admin@example.com', icon: Shield },
+  { role: 'Manager', name: 'Sarah Jenkins', email: 'sarah@example.com', icon: Briefcase },
+  { role: 'Employee', name: 'Alice Cooper', email: 'alice@example.com', icon: User },
+];
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,6 +23,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +37,18 @@ export default function Login() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleQuickFill = (userEmail: string) => {
+    setEmail(userEmail);
+    setPassword('password');
+    setError('');
+  };
+
+  const handleCopy = (userEmail: string) => {
+    navigator.clipboard.writeText(`Email: ${userEmail}\nPassword: password`);
+    setCopiedEmail(userEmail);
+    setTimeout(() => setCopiedEmail(null), 2000);
   };
 
   return (
@@ -95,7 +122,99 @@ export default function Login() {
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-default)' }}>
+        {/* Demo Users Quick Access Section */}
+        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px dashed var(--border-default)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Demo Accounts (Password: password)
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {DEMO_USERS.map(u => {
+              const Icon = u.icon;
+              const isCopied = copiedEmail === u.email;
+              return (
+                <div
+                  key={u.email}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: 'var(--bg-subtle, #f8fafc)',
+                    border: '1px solid var(--border-default, #e2e8f0)',
+                    fontSize: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 6,
+                      background: 'rgba(37, 99, 235, 0.1)',
+                      color: '#2563eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Icon size={14} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.role}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{u.email}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickFill(u.email)}
+                      className="btn"
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        borderRadius: 5,
+                        background: '#eff6ff',
+                        color: '#2563eb',
+                        border: '1px solid #bfdbfe',
+                        cursor: 'pointer'
+                      }}
+                      title="Auto-fill login inputs"
+                    >
+                      Fill
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(u.email)}
+                      className="btn"
+                      style={{
+                        padding: '3px 7px',
+                        fontSize: '11px',
+                        borderRadius: 5,
+                        background: isCopied ? '#ecfdf5' : '#f1f5f9',
+                        color: isCopied ? '#059669' : '#64748b',
+                        border: isCopied ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        cursor: 'pointer'
+                      }}
+                      title="Copy credentials"
+                    >
+                      {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                      {isCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-default)' }}>
           <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--text-tertiary)' }}>
             Leave Management System · © {new Date().getFullYear()} Leave Hub
           </p>
