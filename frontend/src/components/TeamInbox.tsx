@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
-import api from '../api';
+import api, { API_BASE_URL } from '../api';
 import type { TimeOffResponse, DashboardStats } from '../types';
 
 export default function TeamInbox() {
@@ -24,7 +24,7 @@ export default function TeamInbox() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const eventSource = new EventSource(`http://localhost:8080/api/events/subscribe?token=${encodeURIComponent(token)}`);
+    const eventSource = new EventSource(`${API_BASE_URL}/events/subscribe?token=${encodeURIComponent(token)}`);
     eventSource.addEventListener('LEAVE_UPDATE', () => {
       fetchPendingLeaves();
       fetchStats();

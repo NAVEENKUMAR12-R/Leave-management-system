@@ -1,22 +1,58 @@
-# Backend setup
+# Leave Management System - Backend
 
-## Neon PostgreSQL
+Spring Boot 3 + Java 17 + PostgreSQL (Supabase) + Spring Security (JWT)
 
-Set these environment variables before starting Spring Boot:
+---
 
-```text
-DATABASE_URL=jdbc:postgresql://ep-snowy-feather-ay16ej9r-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channelBinding=require
-DATABASE_USERNAME=neondb_owner
-DATABASE_PASSWORD=<your Neon password>
+## 1. Supabase PostgreSQL Configuration
+
+The backend connects to PostgreSQL via JDBC. We recommend using **Supabase** (free tier includes 500MB PostgreSQL with SSL and connection pooling).
+
+### Finding your Supabase Credentials:
+1. Go to your project in the [Supabase Dashboard](https://supabase.com/dashboard).
+2. Go to **Project Settings** (gear icon) -> **Database**.
+3. Scroll to **Connection string**:
+   - Choose **JDBC** or **URI**.
+   - Under **Mode**, select **Session** (Port `5432`). *Note: Free cloud hosts require IPv4, which Supabase's connection pooler (`pooler.supabase.com`) provides.*
+
+### Required Environment Variables:
+```env
+DATABASE_URL=jdbc:postgresql://aws-0-<REGION>.pooler.supabase.com:5432/postgres?sslmode=require
+DATABASE_USERNAME=postgres.<PROJECT_REF>
+DATABASE_PASSWORD=<YOUR_SUPABASE_DB_PASSWORD>
+PORT=8080
 ```
 
-The pooled Neon endpoint is used for the application runtime. `.env.example` is only a template; Spring Boot does not load it automatically. The ignored `backend/.env` file is loaded automatically for local development. Do not commit the real password. Neon credentials are required because this project has no local PostgreSQL fallback.
+### Local Development:
+Create a file named `backend/.env` (which is git-ignored) and add:
+```env
+DATABASE_URL=jdbc:postgresql://aws-0-<REGION>.pooler.supabase.com:5432/postgres?sslmode=require
+DATABASE_USERNAME=postgres.<PROJECT_REF>
+DATABASE_PASSWORD=your_password_here
+PORT=8080
+```
 
-On Windows PowerShell, set them for the current terminal with:
-
-```powershell
-$env:DATABASE_URL = "jdbc:postgresql://ep-snowy-feather-ay16ej9r-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channelBinding=require"
-$env:DATABASE_USERNAME = "neondb_owner"
-$env:DATABASE_PASSWORD = "<your Neon password>"
+Run the backend:
+```bash
 mvn spring-boot:run
 ```
+
+---
+
+## 2. Free Backend Hosting (Render.com)
+
+Render offers a generous **Free Web Service** tier that runs Docker containers for free:
+
+1. Push your code to GitHub (branch: `feature` or `main`).
+2. Go to [Render.com](https://render.com/) and click **New +** -> **Web Service**.
+3. Connect your GitHub repository: `NAVEENKUMAR12-R/Leave-management-system`.
+4. Configure the service:
+   - **Root Directory**: `backend`
+   - **Environment**: `Docker`
+   - **Instance Type**: `Free`
+5. In **Environment Variables**, add:
+   - `DATABASE_URL`: `jdbc:postgresql://aws-0-<REGION>.pooler.supabase.com:5432/postgres?sslmode=require`
+   - `DATABASE_USERNAME`: `postgres.<PROJECT_REF>`
+   - `DATABASE_PASSWORD`: `<YOUR_SUPABASE_PASSWORD>`
+6. Click **Deploy Web Service**.
+7. Once deployed, Render will provide a live HTTPS URL (e.g. `https://leave-management-backend.onrender.com`).
